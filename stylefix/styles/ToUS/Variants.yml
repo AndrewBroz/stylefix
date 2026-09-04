@@ -12,6 +12,10 @@ swap:
   aeroplanes: airplanes
   aetiology: etiology
   ageing: aging
+  agonise: agonize
+  agonised: agonized
+  agonises: agonizes
+  agonising: agonizing
   aluminium: aluminum
   anaemia: anemia
   anaemic: anemic
@@ -22,11 +26,19 @@ swap:
   analogues: analogs
   analyse: analyze
   analysed: analyzed
+  analyser: analyzer
+  analysers: analyzers
   analysing: analyzing
+  antagonise: antagonize
+  antagonised: antagonized
+  antagonises: antagonizes
+  antagonising: antagonizing
   apologise: apologize
   apologised: apologized
   apologises: apologizes
   apologising: apologizing
+  appetiser: appetizer
+  appetisers: appetizers
   armour: armor
   armours: armors
   artefact: artifact
@@ -37,12 +49,20 @@ swap:
   authorised: authorized
   authorises: authorizes
   authorising: authorizing
+  baptise: baptize
+  baptised: baptized
+  baptises: baptizes
+  baptising: baptizing
   behaviour: behavior
   behavioural: behavioral
   behaviours: behaviors
   breathalyse: breathalyze
   breathalysed: breathalyzed
   breathalysing: breathalyzing
+  brutalise: brutalize
+  brutalised: brutalized
+  brutalises: brutalizes
+  brutalising: brutalizing
   calibre: caliber
   calibres: calibers
   cancelled: canceled
@@ -114,6 +134,12 @@ swap:
   colourful: colorful
   colouring: coloring
   colours: colors
+  computerisation: computerization
+  computerisations: computerizations
+  computerise: computerize
+  computerised: computerized
+  computerises: computerizes
+  computerising: computerizing
   cosy: cozy
   counselled: counseled
   counseller: counseler
@@ -121,6 +147,10 @@ swap:
   counselling: counseling
   counsellor: counselor
   counsellors: counselors
+  criminalise: criminalize
+  criminalised: criminalized
+  criminalises: criminalizes
+  criminalising: criminalizing
   criticise: criticize
   criticised: criticized
   criticises: criticizes
@@ -132,6 +162,8 @@ swap:
   customised: customized
   customises: customizes
   customising: customizing
+  decentralisation: decentralization
+  decentralisations: decentralizations
   decentralise: decentralize
   decentralised: decentralized
   decentralises: decentralizes
@@ -139,6 +171,10 @@ swap:
   defence: defense
   defenceless: defenseless
   defences: defenses
+  demonise: demonize
+  demonised: demonized
+  demonises: demonizes
+  demonising: demonizing
   dialled: dialed
   dialler: dialer
   diallers: dialers
@@ -151,9 +187,17 @@ swap:
   digitises: digitizes
   digitising: digitizing
   distil: distill
+  dramatise: dramatize
+  dramatised: dramatized
+  dramatises: dramatizes
+  dramatising: dramatizing
   draught: draft
   draughts: drafts
   dreamt: dreamed
+  economise: economize
+  economised: economized
+  economises: economizes
+  economising: economizing
   emphasise: emphasize
   emphasised: emphasized
   emphasises: emphasizes
@@ -174,6 +218,10 @@ swap:
   enrolment: enrollment
   enrolments: enrollments
   enthral: enthrall
+  equalise: equalize
+  equalised: equalized
+  equalises: equalizes
+  equalising: equalizing
   equalled: equaled
   equaller: equaler
   equallers: equalers
@@ -182,6 +230,10 @@ swap:
   familiarised: familiarized
   familiarises: familiarizes
   familiarising: familiarizing
+  fantasise: fantasize
+  fantasised: fantasized
+  fantasises: fantasizes
+  fantasising: fantasizing
   favour: favor
   favourable: favorable
   favoured: favored
@@ -189,6 +241,12 @@ swap:
   favourite: favorite
   favourites: favorites
   favours: favors
+  fertilise: fertilize
+  fertilised: fertilized
+  fertiliser: fertilizer
+  fertilisers: fertilizers
+  fertilises: fertilizes
+  fertilising: fertilizing
   fervour: fervor
   fibre: fiber
   fibres: fibers
@@ -204,16 +262,26 @@ swap:
   foetal: fetal
   foetus: fetus
   foetuss: fetuss
+  formalisation: formalization
+  formalisations: formalizations
   formalise: formalize
   formalised: formalized
   formalises: formalizes
   formalising: formalizing
+  fossilise: fossilize
+  fossilised: fossilized
+  fossilises: fossilizes
+  fossilising: fossilizing
   fuelled: fueled
   fueller: fueler
   fuellers: fuelers
   fuelling: fueling
   fulfil: fulfill
   fulfilment: fulfillment
+  galvanise: galvanize
+  galvanised: galvanized
+  galvanises: galvanizes
+  galvanising: galvanizing
   generalisation: generalization
   generalisations: generalizations
   generalise: generalize
@@ -237,6 +305,8 @@ swap:
   harboured: harbored
   harbouring: harboring
   harbours: harbors
+  harmonisation: harmonization
+  harmonisations: harmonizations
   harmonise: harmonize
   harmonised: harmonized
   harmonises: harmonizes
@@ -246,11 +316,41 @@ swap:
   honoured: honored
   honouring: honoring
   honours: honors
+  hospitalisation: hospitalization
+  hospitalisations: hospitalizations
+  hospitalise: hospitalize
+  hospitalised: hospitalized
+  hospitalises: hospitalizes
+  hospitalising: hospitalizing
+  humanise: humanize
+  humanised: humanized
+  humanises: humanizes
+  humanising: humanizing
   humour: humor
   humoured: humored
   humouring: humoring
   humourless: humorless
   humours: humors
+  hypothesise: hypothesize
+  hypothesised: hypothesized
+  hypothesises: hypothesizes
+  hypothesising: hypothesizing
+  idealise: idealize
+  idealised: idealized
+  idealises: idealizes
+  idealising: idealizing
+  immunisation: immunization
+  immunisations: immunizations
+  immunise: immunize
+  immunised: immunized
+  immunises: immunizes
+  immunising: immunizing
+  incentivise: incentivize
+  incentivised: incentivized
+  incentivises: incentivizes
+  incentivising: incentivizing
+  industrialisation: industrialization
+  industrialisations: industrializations
   industrialise: industrialize
   industrialised: industrialized
   industrialises: industrializes
@@ -294,15 +394,27 @@ swap:
   labouring: laboring
   labours: labors
   learnt: learned
+  legalisation: legalization
+  legalisations: legalizations
   legalise: legalize
   legalised: legalized
   legalises: legalizes
   legalising: legalizing
+  legitimise: legitimize
+  legitimised: legitimized
+  legitimises: legitimizes
+  legitimising: legitimizing
   leukaemia: leukemia
   levelled: leveled
   leveller: leveler
   levellers: levelers
   levelling: leveling
+  liberalisation: liberalization
+  liberalisations: liberalizations
+  liberalise: liberalize
+  liberalised: liberalized
+  liberalises: liberalizes
+  liberalising: liberalizing
   licence: license
   licences: licenses
   litre: liter
@@ -314,10 +426,16 @@ swap:
   localises: localizes
   localising: localizing
   lustre: luster
+  magnetise: magnetize
+  magnetised: magnetized
+  magnetises: magnetizes
+  magnetising: magnetizing
   manoeuvre: maneuver
   manoeuvred: maneuverd
   manoeuvres: maneuvers
   manoeuvring: maneuveing
+  marginalisation: marginalization
+  marginalisations: marginalizations
   marginalise: marginalize
   marginalised: marginalized
   marginalises: marginalizes
@@ -327,6 +445,8 @@ swap:
   marvellers: marvelers
   marvelling: marveling
   marvellous: marvelous
+  materialisation: materialization
+  materialisations: materializations
   materialise: materialize
   materialised: materialized
   materialises: materializes
@@ -337,6 +457,10 @@ swap:
   maximises: maximizes
   maximising: maximizing
   meagre: meager
+  mechanise: mechanize
+  mechanised: mechanized
+  mechanises: mechanizes
+  mechanising: mechanizing
   mediaeval: medieval
   memorise: memorize
   memorised: memorized
@@ -344,10 +468,20 @@ swap:
   memorising: memorizing
   metre: meter
   metres: meters
+  militarisation: militarization
+  militarisations: militarizations
+  militarise: militarize
+  militarised: militarized
+  militarises: militarizes
+  militarising: militarizing
   millilitre: milliliter
   millilitres: milliliters
   millimetre: millimeter
   millimetres: millimeters
+  minimalise: minimalize
+  minimalised: minimalized
+  minimalises: minimalizes
+  minimalising: minimalizing
   minimisation: minimization
   minimisations: minimizations
   minimise: minimize
@@ -370,10 +504,22 @@ swap:
   modernised: modernized
   modernises: modernizes
   modernising: modernizing
+  moisturiser: moisturizer
+  moisturisers: moisturizers
+  monetisation: monetization
+  monetisations: monetizations
+  monetise: monetize
+  monetised: monetized
+  monetises: monetizes
+  monetising: monetizing
   monopolise: monopolize
   monopolised: monopolized
   monopolises: monopolizes
   monopolising: monopolizing
+  moralise: moralize
+  moralised: moralized
+  moralises: moralizes
+  moralising: moralizing
   mould: mold
   moulded: molded
   moulding: molding
@@ -381,12 +527,20 @@ swap:
   mouldy: moldy
   moustache: mustache
   moustaches: mustaches
+  nationalisation: nationalization
+  nationalisations: nationalizations
+  nationalise: nationalize
+  nationalised: nationalized
+  nationalises: nationalizes
+  nationalising: nationalizing
   neighbour: neighbor
   neighboured: neighbored
   neighbourhood: neighborhood
   neighbourhoods: neighborhoods
   neighbouring: neighboring
   neighbours: neighbors
+  neutralisation: neutralization
+  neutralisations: neutralizations
   neutralise: neutralize
   neutralised: neutralized
   neutralises: neutralizes
@@ -405,10 +559,16 @@ swap:
   offences: offenses
   omelette: omelet
   omelettes: omelets
+  operationalise: operationalize
+  operationalised: operationalized
+  operationalises: operationalizes
+  operationalising: operationalizing
   optimisation: optimization
   optimisations: optimizations
   optimise: optimize
   optimised: optimized
+  optimiser: optimizer
+  optimisers: optimizers
   optimises: optimizes
   optimising: optimizing
   organisation: organization
@@ -416,9 +576,15 @@ swap:
   organisations: organizations
   organise: organize
   organised: organized
+  organiser: organizer
+  organisers: organizers
   organises: organizes
   organising: organizing
   orthopaedic: orthopedic
+  oxidise: oxidize
+  oxidised: oxidized
+  oxidises: oxidizes
+  oxidising: oxidizing
   paediatric: pediatric
   paediatrician: pediatrician
   paediatricians: pediatricians
@@ -429,6 +595,10 @@ swap:
   parametrised: parametrized
   parametrises: parametrizes
   parametrising: parametrizing
+  pasteurise: pasteurize
+  pasteurised: pasteurized
+  pasteurises: pasteurizes
+  pasteurising: pasteurizing
   patronise: patronize
   patronised: patronized
   patronises: patronizes
@@ -437,18 +607,28 @@ swap:
   penalised: penalized
   penalises: penalizes
   penalising: penalizing
+  personalisation: personalization
+  personalisations: personalizations
   personalise: personalize
   personalised: personalized
   personalises: personalizes
   personalising: personalizing
+  plagiarise: plagiarize
+  plagiarised: plagiarized
+  plagiarises: plagiarizes
+  plagiarising: plagiarizing
   plough: plow
   ploughed: plowed
   ploughing: plowing
   ploughs: plows
+  polarisation: polarization
+  polarisations: polarizations
   polarise: polarize
   polarised: polarized
   polarises: polarizes
   polarising: polarizing
+  popularisation: popularization
+  popularisations: popularizations
   popularise: popularize
   popularised: popularized
   popularises: popularizes
@@ -457,6 +637,10 @@ swap:
   practised: practiced
   practises: practices
   practising: practicing
+  pressurise: pressurize
+  pressurised: pressurized
+  pressurises: pressurizes
+  pressurising: pressurizing
   pretence: pretense
   pretences: pretenses
   prioritisation: prioritization
@@ -465,17 +649,39 @@ swap:
   prioritised: prioritized
   prioritises: prioritizes
   prioritising: prioritizing
+  privatisation: privatization
+  privatisations: privatizations
+  privatise: privatize
+  privatised: privatized
+  privatises: privatizes
+  privatising: privatizing
+  professionalise: professionalize
+  professionalised: professionalized
+  professionalises: professionalizes
+  professionalising: professionalizing
   programme: program
   programmes: programs
   publicise: publicize
   publicised: publicized
   publicises: publicizes
   publicising: publicizing
+  pulverise: pulverize
+  pulverised: pulverized
+  pulverises: pulverizes
+  pulverising: pulverizing
   pyjamas: pajamas
   quarrelled: quarreled
   quarreller: quarreler
   quarrellers: quarrelers
   quarrelling: quarreling
+  radicalisation: radicalization
+  radicalisations: radicalizations
+  radicalise: radicalize
+  radicalised: radicalized
+  radicalises: radicalizes
+  radicalising: radicalizing
+  randomisation: randomization
+  randomisations: randomizations
   randomise: randomize
   randomised: randomized
   randomises: randomizes
@@ -499,20 +705,42 @@ swap:
   recognised: recognized
   recognises: recognizes
   recognising: recognizing
+  regularisation: regularization
+  regularisations: regularizations
+  regularise: regularize
+  regularised: regularized
+  regularises: regularizes
+  regularising: regularizing
+  reorganisation: reorganization
+  reorganisations: reorganizations
+  reorganise: reorganize
+  reorganised: reorganized
+  reorganises: reorganizes
+  reorganising: reorganizing
   revolutionise: revolutionize
   revolutionised: revolutionized
   revolutionises: revolutionizes
   revolutionising: revolutionizing
+  romanticise: romanticize
+  romanticised: romanticized
+  romanticises: romanticizes
+  romanticising: romanticizing
   rumour: rumor
   rumoured: rumored
   rumouring: rumoring
   rumours: rumors
   sabre: saber
   sabres: sabers
+  sanitisation: sanitization
+  sanitisations: sanitizations
   sanitise: sanitize
   sanitised: sanitized
   sanitises: sanitizes
   sanitising: sanitizing
+  satirise: satirize
+  satirised: satirized
+  satirises: satirizes
+  satirising: satirizing
   savour: savor
   savoured: savored
   savouring: savoring
@@ -525,10 +753,24 @@ swap:
   scrutinised: scrutinized
   scrutinises: scrutinizes
   scrutinising: scrutinizing
+  secularise: secularize
+  secularised: secularized
+  secularises: secularizes
+  secularising: secularizing
+  sensationalise: sensationalize
+  sensationalised: sensationalized
+  sensationalises: sensationalizes
+  sensationalising: sensationalizing
+  sensitise: sensitize
+  sensitised: sensitized
+  sensitises: sensitizes
+  sensitising: sensitizing
   serialisation: serialization
   serialisations: serializations
   serialise: serialize
   serialised: serialized
+  serialiser: serializer
+  serialisers: serializers
   serialises: serializes
   serialising: serializing
   signalled: signaled
@@ -536,6 +778,8 @@ swap:
   signallers: signalers
   signalling: signaling
   skilful: skillful
+  socialisation: socialization
+  socialisations: socializations
   socialise: socialize
   socialised: socialized
   socialises: socializes
@@ -557,6 +801,8 @@ swap:
   stabilisations: stabilizations
   stabilise: stabilize
   stabilised: stabilized
+  stabiliser: stabilizer
+  stabilisers: stabilizers
   stabilises: stabilizes
   stabilising: stabilizing
   standardisation: standardization
@@ -565,12 +811,22 @@ swap:
   standardised: standardized
   standardises: standardizes
   standardising: standardizing
+  sterilisation: sterilization
+  sterilisations: sterilizations
+  sterilise: sterilize
+  sterilised: sterilized
+  sterilises: sterilizes
+  sterilising: sterilizing
+  stigmatisation: stigmatization
+  stigmatisations: stigmatizations
   stigmatise: stigmatize
   stigmatised: stigmatized
   stigmatises: stigmatizes
   stigmatising: stigmatizing
   storey: story
   storeys: stories
+  subsidisation: subsidization
+  subsidisations: subsidizations
   subsidise: subsidize
   subsidised: subsidized
   subsidises: subsidizes
@@ -588,6 +844,8 @@ swap:
   symbolising: symbolizing
   sympathise: sympathize
   sympathised: sympathized
+  sympathiser: sympathizer
+  sympathisers: sympathizers
   sympathises: sympathizes
   sympathising: sympathizing
   synchronisation: synchronization
@@ -596,6 +854,20 @@ swap:
   synchronised: synchronized
   synchronises: synchronizes
   synchronising: synchronizing
+  synthesise: synthesize
+  synthesised: synthesized
+  synthesiser: synthesizer
+  synthesisers: synthesizers
+  synthesises: synthesizes
+  synthesising: synthesizing
+  systematise: systematize
+  systematised: systematized
+  systematises: systematizes
+  systematising: systematizing
+  temporise: temporize
+  temporised: temporized
+  temporises: temporizes
+  temporising: temporizing
   terrorise: terrorize
   terrorised: terrorized
   terrorises: terrorizes
@@ -610,18 +882,38 @@ swap:
   tokenisations: tokenizations
   tokenise: tokenize
   tokenised: tokenized
+  tokeniser: tokenizer
+  tokenisers: tokenizers
   tokenises: tokenizes
   tokenising: tokenizing
   totalled: totaled
   totaller: totaler
   totallers: totalers
   totalling: totaling
+  traumatise: traumatize
+  traumatised: traumatized
+  traumatises: traumatizes
+  traumatising: traumatizing
   travelled: traveled
   traveller: traveler
   travellers: travelers
   travelling: traveling
+  trivialise: trivialize
+  trivialised: trivialized
+  trivialises: trivializes
+  trivialising: trivializing
   tyre: tire
   tyres: tires
+  unionise: unionize
+  unionised: unionized
+  unionises: unionizes
+  unionising: unionizing
+  urbanisation: urbanization
+  urbanisations: urbanizations
+  urbanise: urbanize
+  urbanised: urbanized
+  urbanises: urbanizes
+  urbanising: urbanizing
   utilisation: utilization
   utilisations: utilizations
   utilise: utilize
@@ -633,6 +925,8 @@ swap:
   vandalised: vandalized
   vandalises: vandalizes
   vandalising: vandalizing
+  vaporisation: vaporization
+  vaporisations: vaporizations
   vaporise: vaporize
   vaporised: vaporized
   vaporises: vaporizes
@@ -648,8 +942,16 @@ swap:
   visualisations: visualizations
   visualise: visualize
   visualised: visualized
+  visualiser: visualizer
+  visualisers: visualizers
   visualises: visualizes
   visualising: visualizing
+  weaponise: weaponize
+  weaponised: weaponized
+  weaponises: weaponizes
+  weaponising: weaponizing
+  westernisation: westernization
+  westernisations: westernizations
   westernise: westernize
   westernised: westernized
   westernises: westernizes
