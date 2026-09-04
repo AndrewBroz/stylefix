@@ -20,9 +20,11 @@ rewrites prose: it picks one of the options you supply, or KEEP.
 ```
 brew install vale            # or see https://vale.sh/docs/install
 uv tool install .            # or: pip install .
+ln -s "$PWD/man/stylefix.1" /opt/homebrew/share/man/man1/   # optional: man stylefix
 ```
 
-Python 3.11+, no third-party dependencies.
+Python 3.11+, no third-party dependencies. `stylefix --help` gives the full
+option reference with examples; `man stylefix` the long form.
 
 ## How it works
 

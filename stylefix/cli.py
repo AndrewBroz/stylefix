@@ -19,36 +19,118 @@ from .vale_runner import Alert, ValeError, run_vale
 FRONT_MATTER = re.compile(r"\A---\n.*?\n---\n", re.S)
 
 
+DESCRIPTION = """\
+Regularize a Markdown file to US or UK English and a style guide, without
+touching code, links, URLs or front matter.
+
+Vale decides what to change. Unambiguous spelling variants (colour/color,
+organise/organize, centre/center ...) and style-guide preferences
+(towards/toward) are replaced outright, with case preserved. Words whose
+correct form depends on meaning (licence/license, programme/program,
+cheque/check, storey/story ...), and any replacement that sits inside a
+quotation or looks like a proper name, are put to a local language model as a
+multiple-choice question with the surrounding sentence; it picks one of the
+supplied options or KEEP, and never rewrites prose. Everything the tool will
+not decide is listed in a report written next to the output.
+
+A final pass fixes punctuation: curly quotes with the right primary style
+(double for US, single for UK), apostrophes, em or spaced en dashes, en dashes
+in number ranges, and date order (September 4, 2026 / 4 September 2026).
+"""
+
+EPILOG = """\
+examples:
+  stylefix draft.md --target us
+      write draft.us.md and draft.us.md.report.md, Chicago conventions,
+      ambiguous words decided by the first reachable model (DGX, then Ollama)
+
+  stylefix draft.md --target uk --oxford-ize -o final.md
+      British spelling with Oxford -ize, Oxford dash and quote style
+
+  stylefix draft.md --target us --dry-run
+      print a unified diff of what would change; write nothing
+
+  stylefix draft.md --target uk --llm none
+      no model: ambiguous words are left alone and listed in the report
+
+  stylefix draft.md --target us --think --batch-size 8 --timeout 600
+      slower, more careful pass for an important document
+
+  stylefix draft.md --target us --accept house-terms.txt
+      never touch the words or phrases listed in house-terms.txt
+
+environment:
+  STYLEFIX_LLM_URL, STYLEFIX_LLM_MODEL, STYLEFIX_LLM_KEY
+      override the model endpoint (same as --url, --model, and the API key)
+  DGX_LLM_DIR   directory holding the dgx-llm .env (default ~/Code/dgx-llm)
+  OLLAMA_HOST   Ollama base URL (default http://localhost:11434)
+
+files:
+  <output>.report.md      every replacement, every model decision with its
+                          reason and confidence, and alerts left for review
+  .stylefix/cache.json    model decisions keyed on word and sentence; edit an
+                          entry to override it on the next run
+
+Requires the vale binary on PATH (brew install vale). Full documentation:
+man stylefix, or README.md in the source tree.
+"""
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
-        prog="stylefix",
-        description="Regularize a Markdown file to US or UK English and a style guide.")
-    p.add_argument("input", type=Path)
-    p.add_argument("-o", "--output", type=Path, help="default: <input>.<target>.md")
-    p.add_argument("-i", "--in-place", action="store_true", help="overwrite the input file")
-    p.add_argument("--target", choices=["us", "uk"], required=True)
-    p.add_argument("--style", choices=["chicago", "oxford", "none"],
-                   help="default: chicago for us, oxford for uk")
-    p.add_argument("--oxford-ize", action="store_true",
-                   help="UK target keeps -ize spellings (Oxford)")
-    p.add_argument("--llm", choices=["auto", "dgx", "ollama", "none"], default="auto",
-                   help="which model endpoint adjudicates ambiguous words (default: auto)")
-    p.add_argument("--model", help="model name at the endpoint")
-    p.add_argument("--url", help="OpenAI-compatible base URL ending in /v1")
-    p.add_argument("--think", action="store_true",
-                   help="let a reasoning model think before answering (slower, more accurate)")
-    p.add_argument("--timeout", type=float, default=120.0, help="seconds per model request")
-    p.add_argument("--min-confidence", type=float, default=0.7)
-    p.add_argument("--batch-size", type=int, default=20)
-    p.add_argument("--parallel", type=int, default=4, help="concurrent model requests")
-    p.add_argument("--accept", type=Path, help="file of words/phrases to leave alone, one per line")
-    p.add_argument("--cache", type=Path, default=Path(".stylefix/cache.json"))
-    p.add_argument("--no-cache", action="store_true")
-    p.add_argument("--report", type=Path, help="default: <output>.report.md")
-    p.add_argument("--no-report", action="store_true")
-    p.add_argument("--dry-run", action="store_true", help="print a diff, write nothing")
-    p.add_argument("-v", "--verbose", action="store_true")
+        prog="stylefix", description=DESCRIPTION, epilog=EPILOG,
+        formatter_class=argparse.RawDescriptionHelpFormatter)
+    p.add_argument("input", type=Path, help="Markdown file to regularize")
     p.add_argument("--version", action="version", version=f"stylefix {__version__}")
+    p.add_argument("-v", "--verbose", action="store_true",
+                   help="report model batches on stderr as they are sent")
+
+    t = p.add_argument_group("target")
+    t.add_argument("--target", choices=["us", "uk"], required=True,
+                   help="English variety to convert to")
+    t.add_argument("--style", choices=["chicago", "oxford", "none"],
+                   help="style guide for punctuation, dashes, dates and word preferences "
+                        "(default: chicago for us, oxford for uk)")
+    t.add_argument("--oxford-ize", action="store_true",
+                   help="with --target uk, keep -ize spellings (Oxford) instead of -ise")
+    t.add_argument("--accept", type=Path, metavar="FILE",
+                   help="words or phrases to leave alone, one per line (a Vale vocabulary)")
+
+    o = p.add_argument_group("output")
+    o.add_argument("-o", "--output", type=Path, metavar="FILE",
+                   help="where to write the result (default: <input>.<target>.md)")
+    o.add_argument("-i", "--in-place", action="store_true",
+                   help="overwrite the input file instead")
+    o.add_argument("--dry-run", action="store_true",
+                   help="print a unified diff to stdout and write nothing")
+    o.add_argument("--report", type=Path, metavar="FILE",
+                   help="where to write the report (default: <output>.report.md)")
+    o.add_argument("--no-report", action="store_true", help="do not write a report")
+
+    m = p.add_argument_group("model", "how ambiguous words are adjudicated")
+    m.add_argument("--llm", choices=["auto", "dgx", "ollama", "none"], default="auto",
+                   help="endpoint preset: dgx (dgx-llm gateway), ollama (local), none (skip the "
+                        "model; ambiguous words go to the report), auto (first reachable of "
+                        "dgx, ollama) (default: %(default)s)")
+    m.add_argument("--url", metavar="URL",
+                   help="OpenAI-compatible base URL ending in /v1; overrides --llm")
+    m.add_argument("--model", metavar="NAME", help="model name at the endpoint")
+    m.add_argument("--think", action="store_true",
+                   help="let a reasoning model think before answering: slower, slightly "
+                        "more accurate; pair with a small --batch-size and a long --timeout")
+    m.add_argument("--min-confidence", type=float, default=0.7, metavar="X",
+                   help="decisions below this confidence are not applied and go to the "
+                        "report (default: %(default)s)")
+    m.add_argument("--batch-size", type=int, default=20, metavar="N",
+                   help="items per model request (default: %(default)s)")
+    m.add_argument("--parallel", type=int, default=4, metavar="N",
+                   help="concurrent model requests (default: %(default)s)")
+    m.add_argument("--timeout", type=float, default=120.0, metavar="SEC",
+                   help="seconds to wait for one model request (default: %(default)s)")
+    m.add_argument("--cache", type=Path, default=Path(".stylefix/cache.json"), metavar="FILE",
+                   help="where model decisions are cached (default: %(default)s)")
+    m.add_argument("--no-cache", action="store_true",
+                   help="neither read nor write the decision cache")
     return p
 
 

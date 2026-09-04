@@ -1,0 +1,221 @@
+.TH STYLEFIX 1 "September 2026" "stylefix 0.1.1" "User Commands"
+.SH NAME
+stylefix \- regularize a Markdown file to US or UK English and a style guide
+.SH SYNOPSIS
+.B stylefix
+.I input.md
+.B \-\-target
+.RB { us | uk }
+.RI [ options ]
+.SH DESCRIPTION
+.B stylefix
+takes a Markdown file and writes a copy whose spelling, punctuation and
+dates follow one English variety (US or UK) and one style guide (Chicago
+Manual of Style or Oxford / New Hart's Rules). It is fully automatic and
+runs locally: Vale decides what to change, a small wrapper applies the
+changes, and a local language model settles the few words that depend on
+meaning. Fenced code, inline code, link targets, URLs and YAML front matter
+are never modified.
+.PP
+Every Vale alert lands in one of three tiers:
+.TP
+.B deterministic
+Unambiguous variants (colour/color, organise/organize, centre/center,
+travelling/traveling) and style preferences (towards/toward) are replaced
+outright, preserving the original word's case.
+.TP
+.B adjudicated
+Words whose correct form depends on sense or part of speech
+(licence/license, practice/practise, programme/program, cheque/check,
+storey/story, tyre/tire, metre/meter, kerb/curb, enquiry/inquiry,
+draught/draft, judgement/judgment, learnt/learned, disc/disk, tonne/ton,
+whisky/whiskey, mum/mom), and any deterministic replacement that sits inside
+a quotation or is capitalised mid-sentence (a possible proper name or
+title), are sent to the model as a multiple-choice question with the
+surrounding sentence. The model picks one of the supplied options or KEEP;
+it never rewrites prose. Invalid or low-confidence answers are not applied.
+.TP
+.B review
+Everything else (possible non-US spellings, missing serial commas, numbers
+that a style guide would spell out) is listed in the report and left alone.
+.PP
+After the word-level edits a punctuation pass converts straight quotes to
+curly, sets the primary quotation style (double for US, single for UK) with
+correct nesting, fixes apostrophes, normalizes parenthetical dashes
+(unspaced em dash for Chicago, spaced en dash for Oxford), puts en dashes in
+number ranges, and reorders dates (September 4, 2026 for US, 4 September
+2026 for UK). Chicago also moves commas and periods inside closing quotes.
+The UK direction never moves punctuation outside quotes, because whether it
+belongs to the quotation is not knowable mechanically.
+.SH OPTIONS
+.SS Target
+.TP
+.BR \-\-target " {us|uk}"
+English variety to convert to. Required.
+.TP
+.BR \-\-style " {chicago|oxford|none}"
+Style guide. Default: chicago for us, oxford for uk.
+.TP
+.B \-\-oxford\-ize
+With
+.BR "\-\-target uk" ,
+keep \-ize spellings (Oxford) instead of converting them to \-ise.
+.TP
+.BI \-\-accept " FILE"
+Words or phrases to leave alone, one per line. Installed as a Vale
+vocabulary, so every rule skips them.
+.SS Output
+.TP
+.BI \-o ", " \-\-output " FILE"
+Where to write the result. Default:
+.IR input . target .md
+(for example draft.us.md).
+.TP
+.BR \-i ", " \-\-in\-place
+Overwrite the input file.
+.TP
+.B \-\-dry\-run
+Print a unified diff to standard output and write nothing.
+.TP
+.BI \-\-report " FILE"
+Where to write the report. Default:
+.IR output .report.md.
+.TP
+.B \-\-no\-report
+Do not write a report.
+.SS Model
+.TP
+.BR \-\-llm " {auto|dgx|ollama|none}"
+Endpoint preset.
+.B dgx
+reads the dgx-llm gateway address, key and primary model from
+.IR $DGX_LLM_DIR/.env .
+.B ollama
+uses the local Ollama server and its first installed model.
+.B none
+skips the model: ambiguous words are left as they are and listed in the
+report, while capitalised deterministic replacements are applied anyway.
+.B auto
+(the default) uses the first of dgx, ollama that answers.
+.TP
+.BI \-\-url " URL"
+Any OpenAI-compatible base URL ending in /v1. Overrides the preset.
+.TP
+.BI \-\-model " NAME"
+Model name at the endpoint.
+.TP
+.B \-\-think
+Let a reasoning model think before answering. Slower by a factor of four to
+ten and slightly more accurate; pair with
+.B \-\-batch\-size 8
+and
+.BR "\-\-timeout 600" .
+.TP
+.BI \-\-min\-confidence " X"
+Decisions reported below this confidence are not applied. Default 0.7.
+.TP
+.BI \-\-batch\-size " N"
+Items per model request. Default 20.
+.TP
+.BI \-\-parallel " N"
+Concurrent model requests. Default 4. A serving stack with continuous
+batching (vLLM) scales almost linearly with this.
+.TP
+.BI \-\-timeout " SEC"
+Seconds to wait for one model request. Default 120.
+.TP
+.BI \-\-cache " FILE"
+Where model decisions are cached, keyed on target, word and sentence.
+Default
+.IR .stylefix/cache.json
+in the working directory. Editing a cached choice overrides it on the next
+run.
+.TP
+.B \-\-no\-cache
+Neither read nor write the cache.
+.SS General
+.TP
+.BR \-v ", " \-\-verbose
+Report model batches on standard error as they are sent.
+.TP
+.B \-\-version
+Print the version and exit.
+.TP
+.BR \-h ", " \-\-help
+Print the usage summary and exit.
+.SH ENVIRONMENT
+.TP
+.BR STYLEFIX_LLM_URL ", " STYLEFIX_LLM_MODEL ", " STYLEFIX_LLM_KEY
+Override the endpoint, model and API key; equivalent to
+.BR \-\-url ", " \-\-model
+and the key that the presets would read.
+.TP
+.B DGX_LLM_DIR
+Directory holding the dgx-llm
+.I .env
+file. Default
+.IR ~/Code/dgx-llm .
+.TP
+.B OLLAMA_HOST
+Ollama base URL. Default http://localhost:11434.
+.SH FILES
+.TP
+.IR output .report.md
+Counts, every deterministic replacement, every model decision with its
+confidence, reason and context, and every alert left for a human, grouped
+by Vale check.
+.TP
+.I .stylefix/cache.json
+Model decision cache. Safe to delete; safe to commit if the team wants
+reproducible runs.
+.SH EXIT STATUS
+.TP
+.B 0
+Finished. Undecided words and review items are reported, not fatal.
+.TP
+.B 2
+Input file missing, or Vale not found or failed.
+.SH EXAMPLES
+Write draft.us.md and draft.us.md.report.md using Chicago conventions:
+.PP
+.nf
+    stylefix draft.md \-\-target us
+.fi
+.PP
+British spelling with Oxford \-ize, to a named file:
+.PP
+.nf
+    stylefix draft.md \-\-target uk \-\-oxford\-ize \-o final.md
+.fi
+.PP
+See what would change without writing anything:
+.PP
+.nf
+    stylefix draft.md \-\-target us \-\-dry\-run
+.fi
+.PP
+Careful pass for an important document, protecting house terms:
+.PP
+.nf
+    stylefix draft.md \-\-target us \-\-think \-\-batch\-size 8 \-\-timeout 600 \\
+             \-\-accept house\-terms.txt
+.fi
+.PP
+A Word document, via pandoc:
+.PP
+.nf
+    pandoc in.docx \-t gfm \-o in.md
+    stylefix in.md \-\-target uk \-o out.md
+    pandoc out.md \-o out.docx
+.fi
+.SH SEE ALSO
+.BR vale (1),
+.BR pandoc (1),
+.BR dgx (1).
+.PP
+Source and README: ~/Code/stylefix. Word pairs live in
+.IR stylefix/wordlist.py ,
+ambiguous-word rules in
+.IR stylefix/candidates.py ,
+style rules as Vale YAML under
+.IR stylefix/styles/ .
