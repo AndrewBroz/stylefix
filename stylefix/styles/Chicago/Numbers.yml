@@ -1,0 +1,8 @@
+# Chicago spells out whole numbers one through one hundred in running
+# text. Heuristic: a bare 1-2 digit number between spaces. Flag only.
+extends: existence
+message: "Chicago spells out numbers under 101 in running text: '%s'."
+level: suggestion
+nonword: true
+tokens:
+  - '\s(?:[1-9]|[1-9]\d)\s'

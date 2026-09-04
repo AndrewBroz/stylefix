@@ -1,0 +1,8 @@
+# UK spellings whose US form depends on sense. Flag only; the stylefix
+# adjudicator chooses (see stylefix/candidates.py).
+extends: existence
+message: "'%s' has more than one US equivalent; needs adjudication."
+level: suggestion
+ignorecase: true
+tokens:
+  - '\b(discs?|tonnes?|whiskys?|mums?)\b'

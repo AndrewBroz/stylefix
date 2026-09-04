@@ -1,0 +1,8 @@
+# New Hart's Rules spells out numbers up to one hundred in general text.
+# Heuristic: a bare 1-2 digit number between spaces. Flag only.
+extends: existence
+message: "Oxford style spells out numbers up to one hundred in running text: '%s'."
+level: suggestion
+nonword: true
+tokens:
+  - '\s(?:[1-9]|[1-9]\d)\s'

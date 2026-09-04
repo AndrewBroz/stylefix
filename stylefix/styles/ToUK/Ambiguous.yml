@@ -1,0 +1,8 @@
+# US spellings that map to more than one UK spelling. Flag only; the
+# stylefix adjudicator chooses (see stylefix/candidates.py).
+extends: existence
+message: "'%s' has more than one UK spelling; needs adjudication."
+level: suggestion
+ignorecase: true
+tokens:
+  - '\b(licenses?|practices?|programs?|checks?|stor(?:y|ies)|tires?|meters?|curbs?|inquir(?:y|ies)|drafts?|judgments?|learned|disks?|tons?|whiskeys?|moms?)\b'

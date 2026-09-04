@@ -1,0 +1,8 @@
+.venv/
+.stylefix/
+__pycache__/
+*.egg-info/
+dist/
+*.us.md
+*.uk.md
+*.report.md

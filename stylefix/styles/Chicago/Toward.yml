@@ -1,0 +1,13 @@
+# Chicago prefers the forms without -s / -st.
+extends: substitution
+message: "Chicago prefers '%s' to '%s'."
+level: warning
+ignorecase: true
+action:
+  name: replace
+swap:
+  towards: toward
+  afterwards: afterward
+  amongst: among
+  whilst: while
+  amidst: amid

@@ -1,0 +1,10 @@
+# New Hart's Rules / British usage prefers the -s forms.
+extends: substitution
+message: "British usage prefers '%s' to '%s'."
+level: warning
+ignorecase: true
+action:
+  name: replace
+swap:
+  toward: towards
+  afterward: afterwards

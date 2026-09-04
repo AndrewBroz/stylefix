@@ -1,0 +1,5 @@
+# Safety net: Vale's bundled US dictionary. Never applied automatically;
+# hits go to the report as "possible non-US spelling".
+extends: spelling
+message: "'%s' may not be a US spelling."
+level: suggestion

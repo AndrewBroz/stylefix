@@ -1,0 +1,7 @@
+# Heuristic: "a, b and c" without the serial comma. Flag only.
+extends: existence
+message: "Oxford style uses the serial (Oxford) comma: check '%s'."
+level: suggestion
+nonword: true
+tokens:
+  - '\w+, \w+ (?:and|or) \w+'
