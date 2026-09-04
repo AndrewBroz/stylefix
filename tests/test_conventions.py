@@ -48,3 +48,9 @@ def test_dashes_chicago_and_oxford():
     assert st.dashes == 3
     uk, _ = normalize("one -- two—three – four --\nnext\n", "uk", "oxford")
     assert uk == "one – two – three – four – next\n"
+
+
+def test_html_comments_and_tags_are_protected():
+    src = "<!-- note -- keep -->\nvalue -- here\n<a href=\"x--y\">it's</a>\n"
+    out, _ = normalize(src, "us", "chicago")
+    assert out == "<!-- note -- keep -->\nvalue—here\n<a href=\"x--y\">it’s</a>\n"

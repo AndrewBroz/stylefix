@@ -17,6 +17,8 @@ _INLINE_CODE = re.compile(r"(`+)[^`\n]*?\1")
 _LINK_DEST = re.compile(r"\]\([^)\s]*(?:\s+\"[^\"]*\")?\)")
 _URL = re.compile(r"<?(?:https?|ftp|mailto):[^\s>)]+>?")
 _FRONT = re.compile(r"\A---\n.*?\n---\n", re.S)
+_HTML_COMMENT = re.compile(r"<!--.*?-->", re.S)
+_HTML_TAG = re.compile(r"</?[A-Za-z][^<>\n]*>")
 
 
 @dataclass
@@ -37,7 +39,7 @@ def protected_spans(text: str) -> list[tuple[int, int]]:
     m = _FRONT.match(text)
     if m:
         spans.append((0, m.end()))
-    for rx in (_FENCE, _INLINE_CODE, _LINK_DEST, _URL):
+    for rx in (_FENCE, _INLINE_CODE, _LINK_DEST, _URL, _HTML_COMMENT, _HTML_TAG):
         spans.extend(m.span() for m in rx.finditer(text))
     spans.sort()
     merged: list[tuple[int, int]] = []
