@@ -101,9 +101,18 @@ batches without changing accuracy noticeably.
 
 ## Exceptions
 
-Put words or phrases to leave alone in a file, one per line, and pass
-`--accept exceptions.txt`. They become a Vale vocabulary and are skipped by
-every rule.
+Words to leave alone come from four places, all optional and all combined:
+
+1. A built-in list (`stylefix/accept.txt`) of technical and policy terms
+   that Vale's dictionary lacks: cybersecurity, sandboxing, auditable,
+   incentivize, LLM, NIST and so on.
+2. `~/.config/stylefix/accept.txt`, your personal list.
+3. `.stylefix/accept.txt` in the working directory, the project's list.
+4. `--accept FILE` for a one-off.
+
+One term per line, `#` comments allowed, case-insensitive. They become a
+Vale vocabulary and are skipped by every rule. `--no-default-accept` uses
+only the `--accept` file.
 
 ## Extending
 

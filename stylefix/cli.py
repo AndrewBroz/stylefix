@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import difflib
+import os
 import re
 import sys
 from pathlib import Path
@@ -57,7 +58,9 @@ examples:
       slower, more careful pass for an important document
 
   stylefix draft.md --target us --accept house-terms.txt
-      never touch the words or phrases listed in house-terms.txt
+      never touch the words or phrases listed in house-terms.txt (these add
+      to a built-in list of technical and policy terms, plus
+      ~/.config/stylefix/accept.txt and ./.stylefix/accept.txt if present)
 
 environment:
   STYLEFIX_LLM_URL, STYLEFIX_LLM_MODEL, STYLEFIX_LLM_KEY
@@ -94,7 +97,10 @@ def build_parser() -> argparse.ArgumentParser:
     t.add_argument("--oxford-ize", action="store_true",
                    help="with --target uk, keep -ize spellings (Oxford) instead of -ise")
     t.add_argument("--accept", type=Path, metavar="FILE",
-                   help="words or phrases to leave alone, one per line (a Vale vocabulary)")
+                   help="extra words or phrases to leave alone, one per line, on top of the "
+                        "built-in list, ~/.config/stylefix/accept.txt and .stylefix/accept.txt")
+    t.add_argument("--no-default-accept", action="store_true",
+                   help="use only the --accept file, ignoring the built-in and user lists")
 
     o = p.add_argument_group("output")
     o.add_argument("-o", "--output", type=Path, metavar="FILE",
@@ -177,6 +183,34 @@ def partition(text: str, alerts: list[Alert], target: str, guide: str):
     return edits, items, review
 
 
+BUILTIN_ACCEPT = Path(__file__).parent / "accept.txt"
+
+
+def accept_sources(explicit: Path | None, no_default: bool) -> list[Path]:
+    """Accept lists in precedence order: built-in, user, project, --accept."""
+    paths: list[Path] = []
+    if not no_default:
+        paths.append(BUILTIN_ACCEPT)
+        cfg = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
+        paths.append(cfg / "stylefix" / "accept.txt")
+        paths.append(Path(".stylefix") / "accept.txt")
+    if explicit:
+        paths.append(explicit)
+    return paths
+
+
+def load_accept_lists(explicit: Path | None, no_default: bool) -> list[str] | None:
+    words: list[str] = []
+    for path in accept_sources(explicit, no_default):
+        if not path.exists():
+            continue
+        for line in path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if line and not line.startswith("#"):
+                words.append(line)
+    return words or None
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if not args.input.exists():
@@ -188,7 +222,7 @@ def main(argv: list[str] | None = None) -> int:
     report_path = args.report or output.with_suffix(output.suffix + ".report.md")
     text = args.input.read_text(encoding="utf-8")
 
-    accept = [w.strip() for w in args.accept.read_text().splitlines() if w.strip()] if args.accept else None
+    accept = load_accept_lists(args.accept, args.no_default_accept)
     try:
         alerts = run_vale(args.input, args.target, guide, args.oxford_ize, accept)
     except ValeError as e:

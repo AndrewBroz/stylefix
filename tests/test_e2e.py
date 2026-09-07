@@ -120,3 +120,32 @@ def test_oxford_ize(tmp_path, stub_url):
     out = tmp_path / "o.md"
     main([str(src), "-o", str(out), "--target", "uk", "--oxford-ize", "--llm", "none", "--no-cache"])
     assert out.read_text() == "We organize and analyse colour.\n"
+
+
+def test_builtin_accept_list_silences_technical_terms(tmp_path):
+    src = tmp_path / "t.md"
+    src.write_text("Cybersecurity and sandboxing are auditable colour choices.\n")
+    out = tmp_path / "o.md"
+    rep = tmp_path / "o.report.md"
+    main([str(src), "-o", str(out), "--target", "us", "--llm", "none", "--no-cache",
+          "--report", str(rep)])
+    r = rep.read_text()
+    assert "cybersecurity" not in r.lower().split("## for human review")[-1]
+    assert "sandboxing" not in r and "auditable" not in r
+    assert out.read_text().startswith("Cybersecurity and sandboxing are auditable color")
+
+
+def test_user_and_project_accept_lists(tmp_path, monkeypatch):
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+    (tmp_path / "cfg" / "stylefix").mkdir(parents=True)
+    (tmp_path / "cfg" / "stylefix" / "accept.txt").write_text("# mine\nfooberry\n")
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".stylefix").mkdir()
+    (tmp_path / ".stylefix" / "accept.txt").write_text("barberry\n")
+    src = tmp_path / "t.md"
+    src.write_text("fooberry barberry bazberry\n")
+    rep = tmp_path / "o.report.md"
+    main([str(src), "-o", str(tmp_path / "o.md"), "--target", "us", "--llm", "none",
+          "--no-cache", "--report", str(rep)])
+    r = rep.read_text()
+    assert "fooberry" not in r and "barberry" not in r and "bazberry" in r

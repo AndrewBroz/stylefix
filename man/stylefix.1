@@ -1,4 +1,4 @@
-.TH STYLEFIX 1 "September 2026" "stylefix 0.1.5" "User Commands"
+.TH STYLEFIX 1 "September 2026" "stylefix 0.1.6" "User Commands"
 .SH NAME
 stylefix \- regularize a Markdown file to US or UK English and a style guide
 .SH SYNOPSIS
@@ -62,8 +62,15 @@ With
 keep \-ize spellings (Oxford) instead of converting them to \-ise.
 .TP
 .BI \-\-accept " FILE"
-Words or phrases to leave alone, one per line. Installed as a Vale
-vocabulary, so every rule skips them.
+Extra words or phrases to leave alone, one per line, # comments allowed.
+Added to the built-in list of technical and policy terms,
+.IR ~/.config/stylefix/accept.txt
+and
+.IR ./.stylefix/accept.txt
+when those exist. Installed as a Vale vocabulary, so every rule skips them.
+.TP
+.B \-\-no\-default\-accept
+Use only the \-\-accept file; ignore the built-in, user and project lists.
 .SS Output
 .TP
 .BI \-o ", " \-\-output " FILE"
@@ -168,6 +175,12 @@ file. Default
 .B OLLAMA_HOST
 Ollama base URL. Default http://localhost:11434.
 .SH FILES
+.TP
+.I ~/.config/stylefix/accept.txt
+Personal accept list, one term per line. Honours XDG_CONFIG_HOME.
+.TP
+.I .stylefix/accept.txt
+Project accept list, read from the working directory.
 .TP
 .IR output .report.md
 Counts, every deterministic replacement, every model decision with its
