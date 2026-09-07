@@ -9,7 +9,7 @@ import re
 import sys
 from pathlib import Path
 
-from . import __version__, candidates, changelog, patterns, report, spellcheck, styleguides
+from . import __version__, candidates, changelog, patterns, report, spellcheck, styleguides, styleitems
 from .adjudicate import Cache, Item, adjudicate
 from .apply import Edit, apply_edits, match_case, to_offsets
 from .context import at_sentence_start, inside_quotes, sentence_context
@@ -150,8 +150,12 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def partition(text: str, alerts: list[Alert], target: str, guide: str,
-              oxford: bool = False):
-    """Split Vale alerts into deterministic edits, adjudication items, and review."""
+              oxford: bool = False, adjudicate_style: bool = False):
+    """Split Vale alerts into deterministic edits, adjudication items, and review.
+
+    Style-guide alerts (serial comma, numerals) become items when a model is
+    available to adjudicate them; otherwise they stay review alerts."""
+    style = styleguides.get(guide)
     fm = FRONT_MATTER.match(text)
     fm_lines = text[:fm.end()].count("\n") if fm else 0
     edits: list[Edit] = []
@@ -204,6 +208,15 @@ def partition(text: str, alerts: list[Alert], target: str, guide: str,
                 next_id += 1
             else:
                 edits.append(Edit(a.line, a.start, a.end, a.match, a.replacement, a.check))
+        elif adjudicate_style and a.check.rsplit(".", 1)[-1] in ("SerialComma", "Numbers"):
+            built = styleitems.candidate(a.check, a.match, style)
+            if built is None:
+                review.append(a)
+                continue
+            cand, rule = built
+            items.append(Item(next_id, a.match, (cand, "KEEP"), rule,
+                              sentence_context(text, s, e), a.line, a.start, a.end, source="style"))
+            next_id += 1
         elif a.check.endswith(".Ambiguous"):
             cand = candidates.lookup(target, a.match, oxford)
             if cand is None:
@@ -272,10 +285,10 @@ def main(argv: list[str] | None = None) -> int:
     except ValeError as e:
         print(f"stylefix: {e}", file=sys.stderr)
         return 2
-    edits, items, review = partition(text, alerts, args.target, guide, args.oxford_ize)
-
     ep = resolve_endpoint(args.llm, args.model, args.url, think=args.think,
                           timeout=args.timeout)
+    edits, items, review = partition(text, alerts, args.target, guide, args.oxford_ize,
+                                     adjudicate_style=ep is not None)
     if items and ep is None:
         print(f"stylefix: no model endpoint available (--llm {args.llm}); "
               f"{len(items)} ambiguous word(s) will be listed for review", file=sys.stderr)

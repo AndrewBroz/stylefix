@@ -31,9 +31,12 @@ def render(*, text: str, target: str, applied: list[Edit], decisions: list[Decis
         how = "auto"
         if e.source == "adjudicated" and d:
             how = f"model {d.confidence:.2f}: {d.reason}"
+            if d.item.source == "style":
+                how = "style, " + how
         elif e.source == "adjudicated":
             how = "model"
-        out.append(f"  L{e.line:<4} {e.original} -> {match_case(e.original, e.replacement):<14} {how}")
+        shown = match_case(e.original, e.replacement).strip() or repr(e.replacement)
+        out.append(f"  L{e.line:<4} {e.original.strip()} -> {shown:<14} {how}")
         out.append(f"        {_context(text, e)}")
     kept = [d for d in decisions if d.choice == "KEEP"
             or (d.choice and d.choice.lower() == d.item.word.lower())]

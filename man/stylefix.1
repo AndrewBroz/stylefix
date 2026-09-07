@@ -1,4 +1,4 @@
-.TH STYLEFIX 1 "September 2026" "stylefix 0.4.0" "User Commands"
+.TH STYLEFIX 1 "September 2026" "stylefix 0.4.1" "User Commands"
 .SH NAME
 stylefix \- regularize a Markdown file to US or UK English and a style guide
 .SH SYNOPSIS
@@ -43,8 +43,8 @@ it never rewrites prose. Invalid or low-confidence answers are not applied.
 .B review
 Everything else is listed in the report and left alone: words that carry
 the other variety's ending, are in its dictionary and not the target's, yet
-could not be converted; missing serial commas; numbers a style guide would
-spell out.
+could not be converted; and, when no model is configured, the serial-comma
+and numeral hits.
 .PP
 After the word-level edits a punctuation pass converts straight quotes to
 curly, sets the primary quotation style (double for US, single for UK) with
@@ -85,7 +85,10 @@ quotes in the variety's primary style, apostrophes, en dashes in ranges,
 date order). Parenthetical dashes, serial commas, numerals, toward/towards
 and punctuation placement are left exactly as written.
 .PP
-Serial-comma and numeral rules only flag; the rest is applied.
+Dashes, toward/towards and punctuation placement are applied outright.
+Serial-comma and numeral hits are adjudicated: the model chooses between one
+concrete edit and KEEP from the sentence and the guide's rule; without a
+model they are listed for review.
 .SH OPTIONS
 .SS Target
 .TP

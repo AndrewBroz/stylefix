@@ -135,7 +135,9 @@ def decide_batch(ep: Endpoint, target: str, items: list[Item]) -> list[Decision]
             out.append(Decision(it, None, 0.0, "no answer from model"))
             continue
         choice = str(a.get("choice", "")).strip()
-        matched = next((o for o in it.options if o.lower() == choice.lower()), None)
+        # Options may carry significant surrounding whitespace (" ten ");
+        # models strip it, so compare trimmed.
+        matched = next((o for o in it.options if o.strip().lower() == choice.lower()), None)
         try:
             conf = float(a.get("confidence", 0))
         except (TypeError, ValueError):

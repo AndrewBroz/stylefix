@@ -34,8 +34,8 @@ Every candidate word lands in one of three tiers:
 | tier | mechanism | what happens |
 |---|---|---|
 | deterministic | **suffix patterns** confirmed against dictionaries, plus a curated table for the irregular families | applied, case preserved |
-| adjudicated | words with a sense split (licence/license, programme/program), pattern hits whose rewrite is in no dictionary (coinages, names), and any hit that is capitalised mid-sentence or inside a quotation | a local model chooses between candidates from `stylefix/candidates.py`, or KEEP |
-| review | spellings that look like the other variety but could not be converted, serial commas, numbers | listed in the report and the `--changes` log |
+| adjudicated | words with a sense split (licence/license, programme/program), pattern hits whose rewrite is in no dictionary (coinages, names), any hit that is capitalised mid-sentence or inside a quotation, and the style guide's serial-comma and numeral rules | a local model chooses between the candidates and KEEP |
+| review | spellings that look like the other variety but could not be converted; serial-comma and numeral hits when no model is configured | listed in the report and the `--changes` log |
 
 **Two data sources, both from the SCOWL project and shipped in
 `stylefix/dict/`.**
@@ -89,9 +89,14 @@ style guide would rule on: parenthetical dashes, serial commas, numerals
 versus words, toward/towards, and whether commas and periods sit inside
 closing quotes.
 
-Serial-comma and numeral rules only ever flag; dashes, toward/towards and
-punctuation placement are applied. A guide from the other variety
-(`--target uk --style chicago`) is allowed and noted on stderr.
+Dashes, toward/towards and punctuation placement are applied outright.
+Serial commas and numerals need judgement (is "attacks, intentional and
+unintentional" a list of three? is "10" a count or a percentage?), so each
+hit becomes an adjudication item: the model sees the sentence and the
+guide's rule of thumb and chooses between one concrete edit ("ten",
+"a, b, and c") and KEEP. With no model configured they are listed for
+review instead. A guide from the other variety (`--target uk --style
+chicago`) is allowed and noted on stderr.
 
 Guides are a few parameters each in `stylefix/styleguides.py`; the Vale
 rules are generated from them.

@@ -17,7 +17,7 @@ SAMPLE = Path(__file__).parent.parent / "examples" / "sample.md"
 
 class StubModel(BaseHTTPRequestHandler):
     """Answers every item with a canned choice keyed on the word."""
-    answers = {"license": "licence", "practice": "practice", "program": "programme",
+    answers = {"license": "licence", "tin": "KEEP", "practice": "practice", "program": "programme",
                "check": "cheque", "story": "story", "labour": "KEEP", "centre": "Centre",
                "defence": "KEEP", "colour": "color", "disc": "disc", "tire": "tire"}
     requests: list[dict] = []
@@ -33,6 +33,11 @@ class StubModel(BaseHTTPRequestHandler):
                 word = word.strip('"“”—').lower()
                 options = line.split("options: ")[1].split(" | ")
                 choice = self.answers.get(word, "KEEP")
+                phrase = line.split('word: "')[1].split('" — options')[0]
+                if ", " in phrase:
+                    choice = options[0]           # serial comma: take the edit
+                elif phrase.strip().isdigit():    # numerals: a count converts, a date stays
+                    choice = options[0] if phrase.strip() == "10" else "KEEP"
                 match = next((o for o in options if o.lower() == choice.lower()), "KEEP")
                 decisions.append({"id": int(num), "choice": match, "confidence": 0.9, "reason": "stub"})
         out = json.dumps({"choices": [{"message": {"content": json.dumps({"decisions": decisions})}}]})
@@ -74,6 +79,7 @@ def test_to_us_chicago(tmp_path, stub_url):
     assert "story of the building is cataloged" in text and "is spelt the British way" in text
     assert "“color” is spelt the British way—while our American colleagues favor “color.”" in text
     assert "runs 3–5 sessions" in text
+    assert "The license fee is ten pounds" in text          # Chicago numeral, via the stub
     assert "Labour Party office by September 4, 2026" in text          # KEEP via stub
     assert "theater program lists the meter readings, the tire pressures" in text
     assert "disc brakes we’ve organized for the aluminum trailer" in text
