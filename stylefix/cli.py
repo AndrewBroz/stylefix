@@ -9,7 +9,7 @@ import re
 import sys
 from pathlib import Path
 
-from . import __version__, candidates, changelog, patterns, report, spellcheck
+from . import __version__, candidates, changelog, patterns, report, spellcheck, styleguides
 from .adjudicate import Cache, Item, adjudicate
 from .apply import Edit, apply_edits, match_case, to_offsets
 from .context import at_sentence_start, inside_quotes, sentence_context
@@ -48,6 +48,9 @@ examples:
   stylefix draft.md --target uk --oxford-ize -o final.md
       British spelling with Oxford -ize, Oxford dash and quote style
 
+  stylefix draft.md --target us --style gpo
+      federal (Government Publishing Office) conventions; --list-styles for all
+
   stylefix draft.md --target us --dry-run
       print a unified diff of what would change; write nothing
 
@@ -83,17 +86,20 @@ def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="stylefix", description=DESCRIPTION, epilog=EPILOG,
         formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("input", type=Path, help="Markdown file to regularize")
+    p.add_argument("input", type=Path, nargs="?", help="Markdown file to regularize")
     p.add_argument("--version", action="version", version=f"stylefix {__version__}")
     p.add_argument("-v", "--verbose", action="store_true",
                    help="report model batches on stderr as they are sent")
 
     t = p.add_argument_group("target")
-    t.add_argument("--target", choices=["us", "uk"], required=True,
-                   help="English variety to convert to")
-    t.add_argument("--style", choices=["chicago", "oxford", "none"],
-                   help="style guide for punctuation, dashes, dates and word preferences "
-                        "(default: chicago for us, oxford for uk)")
+    t.add_argument("--target", choices=["us", "uk"],
+                   help="English variety to convert to (required)")
+    t.add_argument("--style", choices=styleguides.choices(), metavar="GUIDE",
+                   help="style guide for dashes, serial commas, numerals, toward/towards and "
+                        "punctuation placement: " + ", ".join(styleguides.choices()) +
+                        " (default: chicago for us, oxford for uk; --list-styles explains each)")
+    t.add_argument("--list-styles", action="store_true",
+                   help="describe every style guide and exit")
     t.add_argument("--oxford-ize", action="store_true",
                    help="with --target uk, keep -ize spellings (Oxford) instead of -ise")
     t.add_argument("--accept", type=Path, metavar="FILE",
@@ -241,10 +247,20 @@ def load_accept_lists(explicit: Path | None, no_default: bool) -> list[str] | No
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    if not args.input.exists():
+    if args.list_styles:
+        sys.stdout.write(styleguides.describe())
+        return 0
+    if args.target is None:
+        build_parser().error("the following arguments are required: --target")
+    if args.input is None or not args.input.exists():
         print(f"stylefix: no such file: {args.input}", file=sys.stderr)
         return 2
-    guide = args.style or ("chicago" if args.target == "us" else "oxford")
+    guide = args.style or styleguides.DEFAULT_FOR[args.target]
+    g = styleguides.get(guide)
+    if g.variety and g.variety != args.target:
+        print(f"stylefix: note: {guide} is a {g.variety.upper()} style guide applied to a "
+              f"{args.target.upper()} target; spelling follows the target, conventions the guide",
+              file=sys.stderr)
     output = args.input if args.in_place else (
         args.output or args.input.with_suffix(f".{args.target}{args.input.suffix or '.md'}"))
     report_path = args.report or output.with_suffix(output.suffix + ".report.md")

@@ -65,6 +65,37 @@ wins.
 VarCon's Oxford column and flips the -ise/-ize pattern, keeping -yse and
 every other British form.
 
+## Style guides
+
+`--style` chooses the mechanical conventions; spelling always follows
+`--target`. `stylefix --list-styles` prints this table.
+
+| guide | for | dash | serial comma | numerals from | toward | punctuation in quotes |
+|---|---|---|---|---|---|---|
+| `chicago` (US default) | Chicago Manual of Style | unspaced em | required | 101 | toward | inside |
+| `gpo` | US Government Publishing Office Style Manual, the federal standard | unspaced em | required | 10 | toward | inside |
+| `ap` | Associated Press, journalism | spaced em | omitted in a simple series | 10 | toward | inside |
+| `apa` | APA 7th, academic and policy research | unspaced em | required | 10 | no rule | inside |
+| `oxford` (UK default) | New Hart's Rules | spaced en | required | 101 | towards | logical (unchanged) |
+| `guardian` | Guardian/Observer, UK journalism | spaced en | omitted unless needed | 10 | towards | logical (unchanged) |
+| `none` | no guide | unchanged | no rule | no rule | no rule | unchanged |
+
+**What `none` means.** It is not "no changes". Spelling still converts, and
+the target variety's own punctuation still applies: straight quotes become
+curly with the variety's primary style (double for US, single for UK),
+apostrophes are fixed, number ranges get en dashes, and dates take the
+variety's order. What `none` leaves exactly as written is everything a
+style guide would rule on: parenthetical dashes, serial commas, numerals
+versus words, toward/towards, and whether commas and periods sit inside
+closing quotes.
+
+Serial-comma and numeral rules only ever flag; dashes, toward/towards and
+punctuation placement are applied. A guide from the other variety
+(`--target uk --style chicago`) is allowed and noted on stderr.
+
+Guides are a few parameters each in `stylefix/styleguides.py`; the Vale
+rules are generated from them.
+
 After the word-level edits, a punctuation pass handles what a regex rule
 cannot: curly quotes, primary double (US) or single (UK) quotes with correct
 nesting, apostrophes, parenthetical dashes (Chicago em dash / Oxford spaced en

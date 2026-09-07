@@ -1,4 +1,4 @@
-.TH STYLEFIX 1 "September 2026" "stylefix 0.3.1" "User Commands"
+.TH STYLEFIX 1 "September 2026" "stylefix 0.4.0" "User Commands"
 .SH NAME
 stylefix \- regularize a Markdown file to US or UK English and a style guide
 .SH SYNOPSIS
@@ -54,14 +54,53 @@ number ranges, and reorders dates (September 4, 2026 for US, 4 September
 2026 for UK). Chicago also moves commas and periods inside closing quotes.
 The UK direction never moves punctuation outside quotes, because whether it
 belongs to the quotation is not knowable mechanically.
+.SH STYLE GUIDES
+.TP
+.B chicago
+Unspaced em dash, serial comma required, numbers below 101 spelled out,
+toward/among/while, commas and periods inside closing quotes.
+.TP
+.B gpo
+As chicago but numerals from 10. The federal standard.
+.TP
+.B ap
+Spaced em dash, serial comma omitted in a simple series, numerals from 10,
+toward, punctuation inside quotes.
+.TP
+.B apa
+Unspaced em dash, serial comma required, numerals from 10, punctuation
+inside quotes.
+.TP
+.B oxford
+Spaced en dash, Oxford comma required, numbers below 101 spelled out,
+towards/amongst, logical punctuation (placement left as written).
+.TP
+.B guardian
+Spaced en dash, serial comma omitted unless needed, numerals from 10,
+towards, logical punctuation.
+.TP
+.B none
+No guide. Spelling and the target variety's punctuation still apply (curly
+quotes in the variety's primary style, apostrophes, en dashes in ranges,
+date order). Parenthetical dashes, serial commas, numerals, toward/towards
+and punctuation placement are left exactly as written.
+.PP
+Serial-comma and numeral rules only flag; the rest is applied.
 .SH OPTIONS
 .SS Target
 .TP
 .BR \-\-target " {us|uk}"
 English variety to convert to. Required.
 .TP
-.BR \-\-style " {chicago|oxford|none}"
-Style guide. Default: chicago for us, oxford for uk.
+.BR \-\-style " GUIDE"
+Mechanical conventions: dashes, serial commas, numerals, toward/towards,
+punctuation placement. One of chicago (Chicago Manual of Style; US
+default), gpo (US Government Publishing Office Style Manual), ap
+(Associated Press), apa (APA 7th), oxford (New Hart's Rules; UK default),
+guardian (Guardian/Observer), none. Spelling always follows \-\-target.
+.TP
+.B \-\-list\-styles
+Describe every style guide and exit.
 .TP
 .B \-\-oxford\-ize
 With

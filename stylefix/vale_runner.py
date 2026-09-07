@@ -16,7 +16,8 @@ STYLE_SETS = {
     "us": ["ToUS"],
     "uk": ["ToUK"],
 }
-GUIDES = {"chicago": "Chicago", "oxford": "Oxford", "none": None}
+from .styleguides import GUIDES as _GUIDES
+GUIDES = {name: (g.title or None) for name, g in _GUIDES.items()}
 
 
 class ValeError(RuntimeError):

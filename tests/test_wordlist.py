@@ -9,9 +9,11 @@ _spec.loader.exec_module(legacy)
 
 
 def test_generated_styles_are_up_to_date(tmp_path):
+    from stylefix import styleguides
     wordlist.write_styles(tmp_path)
     patterns.write_vale_rules(tmp_path)
-    for style in ("ToUS", "ToUK"):
+    styleguides.write_styles(tmp_path)
+    for style in ("ToUS", "ToUK", "Chicago", "Oxford", "AP", "GPO", "APA", "Guardian"):
         made = {p.name: p.read_text() for p in (tmp_path / style).glob("*.yml")}
         have = {p.name: p.read_text() for p in (wordlist.STYLES_DIR / style).glob("*.yml")}
         assert made == have, f"{style} is stale: run `python -m stylefix.wordlist`"

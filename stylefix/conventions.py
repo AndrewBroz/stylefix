@@ -161,8 +161,8 @@ _DASH = re.compile(r"(?<![-\d–])(?:[ \t]|\n(?!\n))*(?:(?<!-)--(?!-)|—|(?<=\s
 
 
 def parenthetical_dashes(s: str, style: str, stats: Stats) -> str:
-    """style: 'em' -> unspaced em dash (Chicago); 'en' -> spaced en dash (Oxford)."""
-    want = "—" if style == "em" else " – "
+    """style: 'em' unspaced em dash; 'em-spaced' spaced em dash; 'en-spaced'."""
+    want = {"em": "—", "em-spaced": " — ", "en-spaced": " – "}[style]
 
     def rep(m):
         if m.group(0) == want:
@@ -196,18 +196,18 @@ def dates_uk(s: str, stats: Stats) -> str:
 # --- driver ----------------------------------------------------------------
 
 def normalize(text: str, target: str, guide: str = "none") -> tuple[str, Stats]:
+    from .styleguides import get
+    g = get(guide)
     stats = Stats()
     primary = "double" if target == "us" else "single"
-    move = target == "us" and guide == "chicago"
+    move = g.punctuation_inside_quotes
 
     def fn(seg: str) -> str:
         seg = straighten_apostrophes(seg, stats)
         seg = curl_straight_quotes(seg, stats)
         seg = set_primary_quotes(seg, primary, stats, move_punct=move)
-        if guide == "chicago":
-            seg = parenthetical_dashes(seg, "em", stats)
-        elif guide == "oxford":
-            seg = parenthetical_dashes(seg, "en", stats)
+        if g.dash:
+            seg = parenthetical_dashes(seg, g.dash, stats)
         seg = number_ranges(seg, stats)
         seg = dates_us(seg, stats) if target == "us" else dates_uk(seg, stats)
         return seg

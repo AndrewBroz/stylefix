@@ -136,7 +136,9 @@ def write_styles(styles_dir: Path = STYLES_DIR) -> None:
 if __name__ == "__main__":
     write_styles()
     from .patterns import write_vale_rules
+    from .styleguides import write_styles as write_guides
     write_vale_rules(STYLES_DIR)
+    write_guides(STYLES_DIR)
     print(f"wrote styles to {STYLES_DIR}: {len(to_us_map())} to-US ({len(table_only(to_us_map(), 'us'))} in table), "
           f"{len(to_uk_map())} to-UK ({len(table_only(to_uk_map(), 'uk'))} in table), "
           f"{len(to_uk_map(False))} to-Oxford ({len(table_only(to_uk_map(False), 'uk', True))} in table), "
