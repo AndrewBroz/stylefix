@@ -50,9 +50,11 @@ PROFILES = {
 }
 
 SENTENCE_END_RULE = ("The style guide writes this abbreviation without periods. Here it is followed by a "
-                     "capitalised word, so it is either the last word of its sentence (then the sentence "
-                     "still needs its period: choose the form ending in a period) or part of a name or "
-                     "the start of a title ('U.S. Policy': choose the bare form). KEEP only if neither.")
+                     "capitalised word, so it is either the last word of its sentence or part of a name. "
+                     "The two readings would print as:\n  A (sentence ends here): {a}\n  B (part of a name): {b}\n"
+                     "If A reads as two sentences and B runs two sentences together, choose '{end}'. "
+                     "If the capitalised word continues a name or title ('U.S. Treasury', 'U.S. Policy "
+                     "Institute'), choose '{bare}'. KEEP only if neither reading is right.")
 
 
 def _line_col(text: str, pos: int) -> tuple[int, int]:
@@ -99,8 +101,14 @@ def plan(text: str, guide: str, next_id: int = 1) -> tuple[list[Edit], list[Item
                     if re.match(r"\s*$", following) or re.match(r"\n", following):
                         edits.append(_edit(text, s, e, canonical + "."))       # paragraph end
                     elif re.match(r"\s+[A-Z“\"(]", following):
+                        lo, hi = max(rs, s - 45), min(re_, e + 45)
+                        before, after = text[lo:s], text[e:hi]
+                        rule = SENTENCE_END_RULE.format(
+                            a="…" + before + canonical + "." + after + "…",
+                            b="…" + before + canonical + after + "…",
+                            end=canonical + ".", bare=canonical)
                         items.append(Item(next_id, form, (canonical + ".", canonical, "KEEP"),
-                                          SENTENCE_END_RULE, sentence_context(text, s, e),
+                                          rule, sentence_context(text, s, e),
                                           *_line_col(text, s), _line_col(text, s)[1] + (e - s) - 1,
                                           source="abbreviation"))
                         next_id += 1
