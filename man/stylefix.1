@@ -1,4 +1,4 @@
-.TH STYLEFIX 1 "September 2026" "stylefix 0.4.1" "User Commands"
+.TH STYLEFIX 1 "September 2026" "stylefix 0.5.0" "User Commands"
 .SH NAME
 stylefix \- regularize a Markdown file to US or UK English and a style guide
 .SH SYNOPSIS
@@ -58,32 +58,42 @@ belongs to the quotation is not knowable mechanically.
 .TP
 .B chicago
 Unspaced em dash, serial comma required, numbers below 101 spelled out,
-toward/among/while, commas and periods inside closing quotes.
+toward/among/while, commas and periods inside closing quotes. US, UK, PhD
+without periods; 10 a.m.; vs.; e.g.
 .TP
 .B gpo
-As chicago but numerals from 10. The federal standard.
+As chicago but numerals from 10, and U.S., U.K., Ph.D. with periods. The
+federal standard.
 .TP
 .B ap
 Spaced em dash, serial comma omitted in a simple series, numerals from 10,
-toward, punctuation inside quotes.
+toward, punctuation inside quotes. U.S., U.K., Ph.D. with periods.
 .TP
 .B apa
 Unspaced em dash, serial comma required, numerals from 10, punctuation
-inside quotes.
+inside quotes. U.S. with periods; PhD without.
 .TP
 .B oxford
 Spaced en dash, Oxford comma required, numbers below 101 spelled out,
-towards/amongst, logical punctuation (placement left as written).
+towards/amongst, logical punctuation (placement left as written). US, UK,
+PhD without points; vs without a point.
 .TP
 .B guardian
 Spaced en dash, serial comma omitted unless needed, numerals from 10,
-towards, logical punctuation.
+towards, logical punctuation. US, UK, PhD; 10am; v; eg, ie, etc without
+points.
 .TP
 .B none
 No guide. Spelling and the target variety's punctuation still apply (curly
 quotes in the variety's primary style, apostrophes, en dashes in ranges,
 date order). Parenthetical dashes, serial commas, numerals, toward/towards
 and punctuation placement are left exactly as written.
+.PP
+Abbreviations are handled as a class (US/U.S., UK, UN, USA, PhD, clock
+times, vs., e.g., i.e., etc.), each taking the guide's form wherever it
+appears. A "U.S." followed by a capitalised word, when periods are being
+dropped, may end its sentence or begin a name; those occurrences are
+adjudicated.
 .PP
 Dashes, toward/towards and punctuation placement are applied outright.
 Serial-comma and numeral hits are adjudicated: the model chooses between one

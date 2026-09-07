@@ -70,15 +70,24 @@ every other British form.
 `--style` chooses the mechanical conventions; spelling always follows
 `--target`. `stylefix --list-styles` prints this table.
 
-| guide | for | dash | serial comma | numerals from | toward | punctuation in quotes |
-|---|---|---|---|---|---|---|
-| `chicago` (US default) | Chicago Manual of Style | unspaced em | required | 101 | toward | inside |
-| `gpo` | US Government Publishing Office Style Manual, the federal standard | unspaced em | required | 10 | toward | inside |
-| `ap` | Associated Press, journalism | spaced em | omitted in a simple series | 10 | toward | inside |
-| `apa` | APA 7th, academic and policy research | unspaced em | required | 10 | no rule | inside |
-| `oxford` (UK default) | New Hart's Rules | spaced en | required | 101 | towards | logical (unchanged) |
-| `guardian` | Guardian/Observer, UK journalism | spaced en | omitted unless needed | 10 | towards | logical (unchanged) |
-| `none` | no guide | unchanged | no rule | no rule | no rule | unchanged |
+| guide | for | dash | serial comma | numerals from | toward | punctuation in quotes | abbreviations |
+|---|---|---|---|---|---|---|---|
+| `chicago` (US default) | Chicago Manual of Style | unspaced em | required | 101 | toward | inside | US, UK; PhD; 10 a.m.; vs.; e.g. |
+| `gpo` | US Government Publishing Office Style Manual, the federal standard | unspaced em | required | 10 | toward | inside | U.S., U.K.; Ph.D.; 10 a.m.; vs.; e.g. |
+| `ap` | Associated Press, journalism | spaced em | omitted in a simple series | 10 | toward | inside | U.S., U.K.; Ph.D.; 10 a.m.; vs.; e.g. |
+| `apa` | APA 7th, academic and policy research | unspaced em | required | 10 | no rule | inside | U.S.; PhD; 10 a.m.; vs.; e.g. |
+| `oxford` (UK default) | New Hart's Rules | spaced en | required | 101 | towards | logical (unchanged) | US, UK; PhD; 10 a.m.; vs; e.g. |
+| `guardian` | Guardian/Observer, UK journalism | spaced en | omitted unless needed | 10 | towards | logical (unchanged) | US, UK; PhD; 10am; v; eg, ie, etc |
+| `none` | no guide | unchanged | no rule | no rule | no rule | unchanged | unchanged |
+
+**Abbreviations** are handled as a class: the two-letter country
+abbreviations (US, UK, UN, USA), PhD, clock times, vs., and the Latin tags
+e.g., i.e. and etc. each take the guide's form wherever they appear. Every
+form is position-independent except one: when periods are dropped, a
+"U.S." followed by a capitalised word is either the end of its sentence
+(the sentence keeps its period: "in the US. The") or a name ("US Policy"),
+so those occurrences are adjudicated rather than guessed. EU never takes
+periods in any guide and is left alone.
 
 **What `none` means.** It is not "no changes". Spelling still converts, and
 the target variety's own punctuation still applies: straight quotes become

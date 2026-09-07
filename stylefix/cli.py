@@ -9,7 +9,7 @@ import re
 import sys
 from pathlib import Path
 
-from . import __version__, candidates, changelog, patterns, report, spellcheck, styleguides, styleitems
+from . import __version__, abbreviations, candidates, changelog, patterns, report, spellcheck, styleguides, styleitems
 from .adjudicate import Cache, Item, adjudicate
 from .apply import Edit, apply_edits, match_case, to_offsets
 from .context import at_sentence_start, inside_quotes, sentence_context
@@ -289,6 +289,15 @@ def main(argv: list[str] | None = None) -> int:
                           timeout=args.timeout)
     edits, items, review = partition(text, alerts, args.target, guide, args.oxford_ize,
                                      adjudicate_style=ep is not None)
+    ab_edits, ab_items = abbreviations.plan(text, guide, next_id=len(items) + 1)
+    edits += ab_edits
+    if ep is not None:
+        items += ab_items
+    else:
+        for it in ab_items:
+            review.append(Alert(it.line, it.start, it.end, f"{styleguides.get(guide).title}.Abbreviation",
+                                it.word, f"'{it.word}': sentence end or name? Needs a model to decide.",
+                                "suggestion", "", []))
     if items and ep is None:
         print(f"stylefix: no model endpoint available (--llm {args.llm}); "
               f"{len(items)} ambiguous word(s) will be listed for review", file=sys.stderr)

@@ -23,6 +23,7 @@ class StyleGuide:
     punctuation_inside_quotes: bool # move commas and periods inside closing quotes
     variety: str                    # "us" or "uk": the variety the guide assumes
     url: str = ""
+    abbreviations: str = ""         # one-line summary of the abbreviation forms
 
 
 GUIDES: dict[str, StyleGuide] = {g.name: g for g in [
@@ -32,42 +33,48 @@ GUIDES: dict[str, StyleGuide] = {g.name: g for g in [
                "commas and periods inside closing quotes.",
                dash="em", serial_comma="require", spell_out_below=101, adverb_s="drop",
                punctuation_inside_quotes=True, variety="us",
-               url="https://www.chicagomanualofstyle.org/"),
+               url="https://www.chicagomanualofstyle.org/",
+               abbreviations="US, UK, EU without periods; PhD; 10 a.m.; vs.; e.g."),
     StyleGuide("gpo", "GPO",
                "U.S. Government Publishing Office Style Manual: the federal standard. "
                "Unspaced em dash, serial comma, numerals from 10, toward, "
                "punctuation inside quotes.",
                dash="em", serial_comma="require", spell_out_below=10, adverb_s="drop",
                punctuation_inside_quotes=True, variety="us",
-               url="https://www.govinfo.gov/collection/gpo-style-manual"),
+               url="https://www.govinfo.gov/collection/gpo-style-manual",
+               abbreviations="U.S., U.K. with periods; Ph.D.; 10 a.m.; vs.; e.g."),
     StyleGuide("ap", "AP",
                "Associated Press Stylebook: journalism. Spaced em dash, no serial "
                "comma in a simple series, numerals from 10, toward, punctuation "
                "inside quotes.",
                dash="em-spaced", serial_comma="omit", spell_out_below=10, adverb_s="drop",
                punctuation_inside_quotes=True, variety="us",
-               url="https://www.apstylebook.com/"),
+               url="https://www.apstylebook.com/",
+               abbreviations="U.S., U.K. with periods in text; Ph.D.; 10 a.m.; vs.; e.g."),
     StyleGuide("apa", "APA",
                "APA Publication Manual (7th ed.): academic and policy research. "
                "Unspaced em dash, serial comma, numerals from 10, punctuation "
                "inside quotes.",
                dash="em", serial_comma="require", spell_out_below=10, adverb_s=None,
                punctuation_inside_quotes=True, variety="us",
-               url="https://apastyle.apa.org/"),
+               url="https://apastyle.apa.org/",
+               abbreviations="U.S. with periods (as an adjective); PhD; 10 a.m.; vs.; e.g."),
     StyleGuide("oxford", "Oxford",
                "New Hart's Rules (Oxford): spaced en dash, Oxford comma, numbers "
                "up to one hundred spelled out in general text, towards/amongst, "
                "logical punctuation (only what belongs to the quote goes inside).",
                dash="en-spaced", serial_comma="require", spell_out_below=101, adverb_s="keep",
                punctuation_inside_quotes=False, variety="uk",
-               url="https://global.oup.com/academic/product/new-harts-rules-9780199570027"),
+               url="https://global.oup.com/academic/product/new-harts-rules-9780199570027",
+               abbreviations="US, UK without points; PhD; 10 a.m.; vs; e.g."),
     StyleGuide("guardian", "Guardian",
                "Guardian and Observer style guide: UK journalism. Spaced en dash, "
                "no serial comma unless needed, numerals from 10, towards, logical "
                "punctuation.",
                dash="en-spaced", serial_comma="omit", spell_out_below=10, adverb_s="keep",
                punctuation_inside_quotes=False, variety="uk",
-               url="https://www.theguardian.com/guardian-observer-style-guide-a"),
+               url="https://www.theguardian.com/guardian-observer-style-guide-a",
+               abbreviations="US, UK; PhD; 10am; v; eg, ie, etc without points"),
     StyleGuide("none", "",
                "No style guide. Spelling and the target variety's punctuation "
                "conventions only: curly quotes with the variety's primary style, "
@@ -93,6 +100,8 @@ def describe() -> str:
     lines = []
     for g in GUIDES.values():
         lines.append(f"{g.name:9} {g.summary}")
+        if g.abbreviations:
+            lines.append(f"{'':9} abbreviations: {g.abbreviations}")
         if g.url:
             lines.append(f"{'':9} {g.url}")
     return "\n".join(lines) + "\n"
