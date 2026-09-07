@@ -29,13 +29,33 @@ option reference with examples; `man stylefix` the long form.
 
 ## How it works
 
-Every Vale alert lands in one of three tiers:
+Every candidate word lands in one of three tiers:
 
-| tier | Vale rule | what happens |
+| tier | mechanism | what happens |
 |---|---|---|
-| deterministic | `ToUS/Variants`, `ToUK/Variants`, `ToUK/Ise`, `Chicago/Toward`, `Oxford/Towards` (substitution rules with `action: replace`) | applied, case preserved |
-| adjudicated | `ToUS/Ambiguous`, `ToUK/Ambiguous` (existence rules) plus any deterministic hit that is capitalised mid-sentence or inside a quotation | the model chooses between candidates from `stylefix/candidates.py`, or KEEP |
-| review | everything else (`Spelling`, `SerialComma`, `Numbers`) | listed in the report |
+| deterministic | **suffix patterns** confirmed against dictionaries, plus a curated table for the irregular families | applied, case preserved |
+| adjudicated | words with a sense split (licence/license, programme/program), pattern hits whose rewrite is in no dictionary (coinages, names), and any hit that is capitalised mid-sentence or inside a quotation | a local model chooses between candidates from `stylefix/candidates.py`, or KEEP |
+| review | spellings that look like the other variety but could not be converted, serial commas, numbers | listed in the report and the `--changes` log |
+
+**Patterns, not lists, for the productive families.** English keeps coining
+-ize verbs, so a word list is always behind. The -ise/-ize, -yse/-yze,
+-our/-or, -re/-er and -ll-/-l- endings are handled as patterns: a hit is
+split into stem, ending and inflection, rewritten, and confirmed against
+SCOWL-derived en_US and en_GB word lists shipped in `stylefix/dict/`. A
+rewrite that is a known word is applied ("securitise" becomes "securitize"
+without anyone listing it); one that is in no dictionary goes to the model
+("platformise"); a word already valid in the target variety is left alone
+("advertise", "precise", "glamour", "acre"). Short never-lists cover the
+cases where both spellings are real words with different meanings
+(prize/prise, timber/timbre, meter/metre, four/for).
+
+**Tables for the closed families.** -ogue, ae/oe, -ence/-ense, the doubled-l
+verbs in the UK direction, and irregulars like manoeuvre/maneuver stay in
+`stylefix/wordlist.py`. Table hits win over pattern hits on the same word.
+
+**UK variants.** The default UK target writes -ise; `--oxford-ize` flips the
+-ise/-ize pattern to produce -ize while keeping -yse and every other UK
+form. Both are decided from en_GB, which lists Oxford spellings.
 
 After the word-level edits, a punctuation pass handles what a regex rule
 cannot: curly quotes, primary double (US) or single (UK) quotes with correct
@@ -104,8 +124,8 @@ batches without changing accuracy noticeably.
 Words to leave alone come from four places, all optional and all combined:
 
 1. A built-in list (`stylefix/accept.txt`) of technical and policy terms
-   that Vale's dictionary lacks: cybersecurity, sandboxing, auditable,
-   incentivize, LLM, NIST and so on.
+   and acronyms (cybersecurity, sandboxing, LLM, NIST). A test ensures
+   nothing on it is a word the conversion tables know.
 2. `~/.config/stylefix/accept.txt`, your personal list.
 3. `.stylefix/accept.txt` in the working directory, the project's list.
 4. `--accept FILE` for a one-off.
@@ -116,9 +136,12 @@ only the `--accept` file.
 
 ## Extending
 
-- **Word pairs** live in `stylefix/wordlist.py`. Edit the table, then run
-  `python -m stylefix.wordlist` to regenerate the Vale rules (a test fails if
-  they drift).
+- **Suffix families** live in `stylefix/patterns.py`: the regexes, the
+  never-lists, and the decision logic. Word pairs for the closed families
+  live in `stylefix/wordlist.py`. After editing either, run
+  `python -m stylefix.wordlist` to regenerate the Vale rules (a test fails
+  if they drift). A coverage test checks that the pattern mechanism never
+  contradicts the table.
 - **Ambiguous words** live in `stylefix/candidates.py` and the matching
   `Ambiguous.yml` token regex.
 - **Style rules** are plain Vale YAML under `stylefix/styles/Chicago` and

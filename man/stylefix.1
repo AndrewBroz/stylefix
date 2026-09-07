@@ -1,4 +1,4 @@
-.TH STYLEFIX 1 "September 2026" "stylefix 0.1.7" "User Commands"
+.TH STYLEFIX 1 "September 2026" "stylefix 0.2.0" "User Commands"
 .SH NAME
 stylefix \- regularize a Markdown file to US or UK English and a style guide
 .SH SYNOPSIS
@@ -20,24 +20,31 @@ are never modified.
 Every Vale alert lands in one of three tiers:
 .TP
 .B deterministic
-Unambiguous variants (colour/color, organise/organize, centre/center,
-travelling/traveling) and style preferences (towards/toward) are replaced
-outright, preserving the original word's case.
+The productive endings (-ise/-ize, -yse/-yze, -our/-or, -re/-er, -ll-/-l-)
+are handled as patterns: a hit is rewritten and confirmed against the
+shipped en_US and en_GB word lists, so coinages convert without being
+listed and words already valid in the target (advertise, precise, glamour)
+are left alone. Closed families (-ogue, ae/oe, -ence/-ense, irregulars)
+come from a curated table. Style preferences (towards/toward) are table
+swaps. Replacements preserve the original word's case.
 .TP
 .B adjudicated
 Words whose correct form depends on sense or part of speech
 (licence/license, practice/practise, programme/program, cheque/check,
 storey/story, tyre/tire, metre/meter, kerb/curb, enquiry/inquiry,
 draught/draft, judgement/judgment, learnt/learned, disc/disk, tonne/ton,
-whisky/whiskey, mum/mom), and any deterministic replacement that sits inside
-a quotation or is capitalised mid-sentence (a possible proper name or
-title), are sent to the model as a multiple-choice question with the
+whisky/whiskey, mum/mom), pattern hits whose rewrite is in no dictionary (a coinage,
+a name or a typo), and any replacement that sits inside a quotation or is
+capitalised mid-sentence (a possible proper name or title), are sent to
+the model as a multiple-choice question with the
 surrounding sentence. The model picks one of the supplied options or KEEP;
 it never rewrites prose. Invalid or low-confidence answers are not applied.
 .TP
 .B review
-Everything else (possible non-US spellings, missing serial commas, numbers
-that a style guide would spell out) is listed in the report and left alone.
+Everything else is listed in the report and left alone: words that carry
+the other variety's ending, are in its dictionary and not the target's, yet
+could not be converted; missing serial commas; numbers a style guide would
+spell out.
 .PP
 After the word-level edits a punctuation pass converts straight quotes to
 curly, sets the primary quotation style (double for US, single for UK) with

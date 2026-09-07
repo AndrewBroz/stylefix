@@ -9,7 +9,7 @@ import re
 import sys
 from pathlib import Path
 
-from . import __version__, candidates, changelog, report
+from . import __version__, candidates, changelog, patterns, report, spellcheck
 from .adjudicate import Cache, Item, adjudicate
 from .apply import Edit, apply_edits, match_case, to_offsets
 from .context import at_sentence_start, inside_quotes, sentence_context
@@ -143,7 +143,8 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
-def partition(text: str, alerts: list[Alert], target: str, guide: str):
+def partition(text: str, alerts: list[Alert], target: str, guide: str,
+              oxford: bool = False):
     """Split Vale alerts into deterministic edits, adjudication items, and review."""
     fm = FRONT_MATTER.match(text)
     fm_lines = text[:fm.end()].count("\n") if fm else 0
@@ -151,10 +152,37 @@ def partition(text: str, alerts: list[Alert], target: str, guide: str):
     items: list[Item] = []
     review: list[Alert] = []
     next_id = 1
+    # Table hits win over pattern hits on the same span.
+    table_spans = {(a.line, a.start, a.end) for a in alerts if a.replacement}
+    table_lines = {}
+    for a in alerts:
+        if a.replacement:
+            table_lines.setdefault(a.line, []).append((a.start, a.end))
     for a in alerts:
         if a.line <= fm_lines:
             continue  # never touch front matter
         s, e = to_offsets(text, Edit(a.line, a.start, a.end, a.match, "", ""))
+        rule = a.check.rsplit(".", 1)[-1]
+        if rule in patterns.CHECK_FAMILY:
+            if any(st <= a.start <= en or st <= a.end <= en for st, en in table_lines.get(a.line, [])):
+                continue
+            out = patterns.decide(a.match, patterns.CHECK_FAMILY[rule], target, oxford)
+            if out.status in ("skip", "reject"):
+                continue
+            if out.status == "ask":
+                items.append(Item(next_id, a.match, (match_case(a.match, out.candidate), "KEEP"),
+                                  f"'{a.match}' looks like it takes the {target.upper()} ending "
+                                  f"'{out.candidate[-4:]}', but neither spelling is in our dictionaries. "
+                                  "Choose the rewritten form if this is an ordinary English word with "
+                                  "that ending; KEEP if it is a name, a deliberate coinage, or not "
+                                  "that suffix at all.",
+                                  sentence_context(text, s, e), a.line, a.start, a.end,
+                                  source="pattern"))
+                next_id += 1
+                continue
+            # auto: treat exactly like a table replacement from here on
+            a = Alert(a.line, a.start, a.end, a.check, a.match, a.message, a.severity,
+                      "replace", [out.candidate])
         if a.replacement:
             capitalized = a.match[:1].isupper() and not a.match.isupper() \
                 and not at_sentence_start(text, s)
@@ -228,7 +256,7 @@ def main(argv: list[str] | None = None) -> int:
     except ValeError as e:
         print(f"stylefix: {e}", file=sys.stderr)
         return 2
-    edits, items, review = partition(text, alerts, args.target, guide)
+    edits, items, review = partition(text, alerts, args.target, guide, args.oxford_ize)
 
     ep = resolve_endpoint(args.llm, args.model, args.url, think=args.think,
                           timeout=args.timeout)
@@ -252,6 +280,7 @@ def main(argv: list[str] | None = None) -> int:
     new_text, skipped = apply_edits(text, edits)
     new_text, stats = normalize(new_text, args.target, guide)
     applied = [e for e in edits if e not in skipped]
+    review += spellcheck.review_spellings(new_text, args.target, set(accept or ()))
 
     if args.dry_run:
         sys.stdout.writelines(difflib.unified_diff(

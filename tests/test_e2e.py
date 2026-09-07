@@ -138,14 +138,14 @@ def test_builtin_accept_list_silences_technical_terms(tmp_path):
 def test_user_and_project_accept_lists(tmp_path, monkeypatch):
     monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
     (tmp_path / "cfg" / "stylefix").mkdir(parents=True)
-    (tmp_path / "cfg" / "stylefix" / "accept.txt").write_text("# mine\nfooberry\n")
+    (tmp_path / "cfg" / "stylefix" / "accept.txt").write_text("# mine\nhonour\n")
     monkeypatch.chdir(tmp_path)
     (tmp_path / ".stylefix").mkdir()
-    (tmp_path / ".stylefix" / "accept.txt").write_text("barberry\n")
+    (tmp_path / ".stylefix" / "accept.txt").write_text("flavour\n")
     src = tmp_path / "t.md"
-    src.write_text("fooberry barberry bazberry\n")
+    src.write_text("honour flavour vigour\n")
     rep = tmp_path / "o.report.md"
     main([str(src), "-o", str(tmp_path / "o.md"), "--target", "us", "--llm", "none",
           "--no-cache", "--report", str(rep)])
-    r = rep.read_text()
-    assert "fooberry" not in r and "barberry" not in r and "bazberry" in r
+    assert (tmp_path / "o.md").read_text() == "honour flavour vigor\n"
+    assert "honour" not in rep.read_text() and "flavour" not in rep.read_text()

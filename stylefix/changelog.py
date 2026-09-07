@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections import defaultdict
 
 from .adjudicate import Decision
-from .apply import Edit
+from .apply import Edit, match_case
 from .conventions import Stats
 from .vale_runner import Alert
 
@@ -33,7 +33,7 @@ def render(*, text: str, target: str, applied: list[Edit], decisions: list[Decis
             how = f"model {d.confidence:.2f}: {d.reason}"
         elif e.source == "adjudicated":
             how = "model"
-        out.append(f"  L{e.line:<4} {e.original} -> {e.replacement:<14} {how}")
+        out.append(f"  L{e.line:<4} {e.original} -> {match_case(e.original, e.replacement):<14} {how}")
         out.append(f"        {_context(text, e)}")
     kept = [d for d in decisions if d.choice == "KEEP"
             or (d.choice and d.choice.lower() == d.item.word.lower())]

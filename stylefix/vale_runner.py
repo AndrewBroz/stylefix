@@ -79,8 +79,11 @@ def build_config(workdir: Path, target: str, guide: str, oxford_ize: bool,
         lines[0] = f"StylesPath = {shadow}"
         lines.append("Vocab = Project")
     lines += ["", "[*]", f"BasedOnStyles = {', '.join(styles)}"]
-    if target == "uk" and oxford_ize:
-        lines.append("ToUK.Ise = NO")
+    if target == "uk":
+        # Non-Oxford UK converts -ize to -ise; Oxford does the reverse.
+        lines.append("ToUK.Ise = NO" if oxford_ize else "ToUK.PatIse = NO")
+        if oxford_ize:
+            lines.append("ToUK.PatIze = NO")
     ini = workdir / ".vale.ini"
     ini.write_text("\n".join(lines) + "\n")
     return ini

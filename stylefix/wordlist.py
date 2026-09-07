@@ -178,7 +178,8 @@ BOTH = [
     ("paediatrician", "pediatrician", "n"), ("orthopaedic", "orthopedic", "x"),
     ("haemorrhage", "hemorrhage", "n"), ("haemoglobin", "hemoglobin", "x"),
     ("oesophagus", "esophagus", "x"), ("foetus", "fetus", "n"), ("foetal", "fetal", "x"),
-    ("diarrhoea", "diarrhea", "x"), ("manoeuvre", "maneuver", "v"),
+    ("diarrhoea", "diarrhea", "x"), ("manoeuvre", "maneuver", "n"),
+    ("manoeuvred", "maneuvered", "x"), ("manoeuvring", "maneuvering", "x"),
     ("mediaeval", "medieval", "x"), ("leukaemia", "leukemia", "x"),
     ("oestrogen", "estrogen", "x"), ("anaesthesia", "anesthesia", "x"),
     ("anaesthetic", "anesthetic", "n"), ("aetiology", "etiology", "x"),
@@ -300,4 +301,6 @@ def write_styles(styles_dir: Path = STYLES_DIR) -> None:
 
 if __name__ == "__main__":
     write_styles()
+    from .patterns import write_vale_rules
+    write_vale_rules(STYLES_DIR)
     print(f"wrote styles to {STYLES_DIR}")
