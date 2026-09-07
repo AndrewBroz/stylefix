@@ -8,7 +8,7 @@ import re
 import sys
 from pathlib import Path
 
-from . import __version__, candidates, report
+from . import __version__, candidates, changelog, report
 from .adjudicate import Cache, Item, adjudicate
 from .apply import Edit, apply_edits, match_case, to_offsets
 from .context import at_sentence_start, inside_quotes, sentence_context
@@ -106,6 +106,9 @@ def build_parser() -> argparse.ArgumentParser:
     o.add_argument("--report", type=Path, metavar="FILE",
                    help="where to write the report (default: <output>.report.md)")
     o.add_argument("--no-report", action="store_true", help="do not write a report")
+    o.add_argument("--changes", action="store_true",
+                   help="print every change to stderr: line, before -> after, context, and "
+                        "how it was decided (-v implies this)")
 
     m = p.add_argument_group("model", "how ambiguous words are adjudicated")
     m.add_argument("--llm", choices=["auto", "dgx", "ollama", "none"], default="auto",
@@ -228,6 +231,9 @@ def main(argv: list[str] | None = None) -> int:
                            review=review, stats=stats)
     if not args.no_report and not args.dry_run:
         report_path.write_text(rep_md, encoding="utf-8")
+    if args.changes or args.verbose:
+        sys.stderr.write(changelog.render(text=text, target=args.target, applied=applied,
+                                          decisions=decisions, stats=stats, skipped=skipped))
     undecided = sum(1 for d in decisions if d.choice is None)
     print(f"stylefix: {len(applied)} replacement(s), {len(decisions)} adjudicated "
           f"({undecided} undecided), {len(review)} alert(s) for review"

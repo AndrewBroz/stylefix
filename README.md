@@ -7,6 +7,7 @@ Regularize a Markdown file to **US or UK English** and a **style guide**
 stylefix draft.md --target us              # -> draft.us.md + draft.us.md.report.md
 stylefix draft.md --target uk --oxford-ize # UK with Oxford -ize spellings
 stylefix draft.md --target us --dry-run    # print a diff, write nothing
+stylefix draft.md --target us --changes    # list every change as it is made
 ```
 
 [Vale](https://vale.sh) decides what to change; a small Python wrapper applies
