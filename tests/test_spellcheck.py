@@ -22,3 +22,8 @@ def test_accept_and_dedupe():
 def test_l_forms_use_stem_rule():
     uk = review_spellings("They traveled, controlled, sailed, paralleled and modeled.\n", "uk")
     assert {a.match for a in uk} == {"traveled", "modeled"}
+
+
+def test_inflected_forms_valid_in_target_are_not_flagged():
+    us = review_spellings("Compromising measures were honoured and centred.\n", "us")
+    assert {a.match for a in us} == {"honoured", "centred"}

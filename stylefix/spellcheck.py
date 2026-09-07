@@ -33,13 +33,10 @@ def _other_variety(word: str, target: str, other: str) -> bool:
     """True when the word, or its base form, is in the other variety's list
     and not in the target's."""
     forms = [word] + [word[:-len(x)] for x in _INFLECTIONS if word.endswith(x) and len(word) > len(x) + 2]
-    forms += [word[:-len(x)] + "e" for x in ("d", "s") if word.endswith(x)]
-    for f in forms:
-        if dictionary.known(f, target):
-            return False
-        if dictionary.known(f, other):
-            return True
-    return False
+    forms += [word[:-len(x)] + "e" for x in ("d", "s", "ing", "es") if word.endswith(x)]
+    if any(dictionary.known(f, target) for f in forms):
+        return False
+    return any(dictionary.known(f, other) for f in forms)
 
 
 def review_spellings(text: str, target: str, accept: set[str] | None = None) -> list[Alert]:
