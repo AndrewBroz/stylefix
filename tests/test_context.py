@@ -31,3 +31,9 @@ def test_inside_quotes():
 def test_inside_quotes_opening_quote_right_before_word():
     text = "we favour 'color' here.\n"
     assert inside_quotes(text, text.index("color"))
+
+
+def test_link_text_and_parentheses_are_not_sentence_starts():
+    text = "See the [Center for AI](https://x.y) and (Centre for Z) now.\n"
+    assert not at_sentence_start(text, text.index("Center"))
+    assert not at_sentence_start(text, text.index("Centre"))

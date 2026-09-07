@@ -39,7 +39,9 @@ def sentence_context(text: str, start: int, end: int, radius: int = 1,
     return snippet
 
 
-_SENTENCE_START_PUNCT = set('.!?:"“‘\'([')
+# Brackets are not sentence starts: "[Center for X](url)" and "(Centre for Y)"
+# keep their capital because of the name, so the word is adjudicated.
+_SENTENCE_START_PUNCT = set('.!?:"“‘\'')
 
 
 def at_sentence_start(text: str, pos: int) -> bool:
