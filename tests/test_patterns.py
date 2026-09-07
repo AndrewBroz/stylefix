@@ -73,36 +73,32 @@ def _family_for(word: str) -> str | None:
     return None
 
 
-def _ok(out, want):
-    """The pattern may defer to the table (skip, ask, or an explicit reject
-    for words on a never-list) but must never confirm a different spelling."""
-    return out.status != "auto" or out.candidate == want
-
-
-def test_patterns_cover_the_curated_tables():
-    """Every -ise/-our/-re/-ll table entry must be handled consistently by
-    the pattern mechanism alone, in both directions where the pattern
-    applies. The tables still win on overlap in the real pipeline."""
-    misses = []
-    auto = 0
-    for uk, us in wordlist.to_us_map().items():
-        fam = _family_for(uk)
-        if fam is None:
-            continue
-        out = decide(uk, fam, "us")
-        auto += out.status == "auto"
-        if not _ok(out, us):
-            misses.append(("us", uk, us, out))
-    for us, uk in wordlist.to_uk_map(ise=True).items():
-        fam = None
-        for check, rx in VALE_TOKENS["uk"].items():
-            if check != "PatIse" and re.fullmatch(rx.strip("\\b"), us):
-                fam = CHECK_FAMILY[check]
-        if fam is None:
-            continue
-        out = decide(us, fam, "uk")
-        auto += out.status == "auto"
-        if not _ok(out, uk):
-            misses.append(("uk", us, uk, out))
-    assert not misses, "\n".join(map(str, misses[:40])) + f"\n{len(misses)} misses"
-    assert auto > 900, auto      # the mechanism, not the table, carries the bulk
+def test_patterns_agree_with_varcon():
+    """Over VarCon's whole map, a pattern that fires must give VarCon's answer
+    or a spelling the dictionaries know (a valid variant the table will
+    override); it must never manufacture a non-word. And it must carry a
+    real share of the work."""
+    from stylefix import dictionary
+    checked = auto = 0
+    bad = []
+    for target, full, oxford in (("us", wordlist.to_us_map(), False),
+                                 ("uk", wordlist.to_uk_map(ise=True), False)):
+        for src, want in full.items():
+            fam = None
+            for check, rx in VALE_TOKENS[target].items():
+                if target == "uk" and check == "PatIse":
+                    continue
+                if re.fullmatch(rx.strip("\\b"), src):
+                    fam = CHECK_FAMILY[check]
+            if fam is None:
+                continue
+            checked += 1
+            out = decide(src, fam, target, oxford)
+            if out.status == "auto":
+                auto += 1
+                c = out.candidate.lower()
+                forms = [c] + [c[:-len(x)] for x in ("rs", "r", "s", "d") if c.endswith(x)]
+                if c != want.lower() and not any(dictionary.known_anywhere(f) for f in forms):
+                    bad.append((target, src, want, out.candidate))
+    assert not bad, "\n".join(map(str, bad[:30])) + f"\n{len(bad)} non-words"
+    assert checked > 5000 and auto / checked > 0.5, (checked, auto)

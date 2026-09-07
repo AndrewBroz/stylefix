@@ -199,7 +199,7 @@ def partition(text: str, alerts: list[Alert], target: str, guide: str,
             else:
                 edits.append(Edit(a.line, a.start, a.end, a.match, a.replacement, a.check))
         elif a.check.endswith(".Ambiguous"):
-            cand = candidates.lookup(target, a.match)
+            cand = candidates.lookup(target, a.match, oxford)
             if cand is None:
                 review.append(a)
                 continue

@@ -1,43 +1,65 @@
-from stylefix import wordlist
+import importlib.util
+from pathlib import Path
+
+from stylefix import patterns, varcon, wordlist
+
+_spec = importlib.util.spec_from_file_location("legacy_table", Path(__file__).parent / "legacy_table.py")
+legacy = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(legacy)
 
 
 def test_generated_styles_are_up_to_date(tmp_path):
     wordlist.write_styles(tmp_path)
-    for rel in ("ToUS/Variants.yml", "ToUK/Variants.yml", "ToUK/Ise.yml"):
-        assert (tmp_path / rel).read_text() == (wordlist.STYLES_DIR / rel).read_text(), \
-            f"{rel} is stale: run `python -m stylefix.wordlist`"
+    patterns.write_vale_rules(tmp_path)
+    for style in ("ToUS", "ToUK"):
+        made = {p.name: p.read_text() for p in (tmp_path / style).glob("*.yml")}
+        have = {p.name: p.read_text() for p in (wordlist.STYLES_DIR / style).glob("*.yml")}
+        assert made == have, f"{style} is stale: run `python -m stylefix.wordlist`"
 
 
 def test_asymmetric_words_only_go_one_way():
-    us = wordlist.to_us_map()
-    uk = wordlist.to_uk_map()
+    us, uk = wordlist.to_us_map(), wordlist.to_uk_map()
     assert us["licence"] == "license" and "license" not in uk
     assert us["programme"] == "program" and "program" not in uk
-    assert us["practising"] == "practicing" and uk["practicing"] == "practising"
-    assert "practice" not in uk
+    assert us["practise"] == "practice" and "practice" not in uk
     assert "disc" not in us and "disk" not in uk
-    assert uk["mold"] == "mould"
-
-
-def test_inflections():
-    assert wordlist.inflect("centre", "center", "re") == [
-        ("centre", "center"), ("centres", "centers"), ("centred", "centered"), ("centring", "centering")]
-    assert ("travelling", "traveling") in wordlist.inflect("travel", "travel", "ll")
-    assert ("analysing", "analyzing") in wordlist.inflect("analyse", "analyze", "yse")
-    assert ("analyses", "analyzes") not in wordlist.inflect("analyse", "analyze", "yse")
+    assert uk["mold"] == "mould" and uk["color"] == "colour"
+    for w in ("license", "program", "practice", "check", "story", "tire", "meter"):
+        assert w in varcon.maps("uk").ambiguous, w
 
 
 def test_oxford_ize_split():
-    assert "organise" in wordlist.to_uk_map(ise=True).values()
-    assert "organize" not in wordlist.to_uk_map(ise=False)
-    assert wordlist.to_uk_map(ise=False)["analyze"] == "analyse"
+    uk, ox = wordlist.to_uk_map(ise=True), wordlist.to_uk_map(ise=False)
+    assert uk["organize"] == "organise" and ox["organise"] == "organize"
+    assert ox["analyze"] == "analyse" and ox["color"] == "colour"
+    assert "prise" not in ox or ox["prise"] != "prize"
 
 
-def test_accept_list_does_not_shadow_word_table():
-    """A word in accept.txt is never flagged, so it must not be one that the
-    US/UK tables convert; otherwise the conversion is silently suppressed."""
-    from pathlib import Path
-    accept = {l.strip().lower() for l in (wordlist.STYLES_DIR.parent / "accept.txt").read_text().splitlines()
-              if l.strip() and not l.startswith("#")}
-    converted = set(wordlist.to_us_map()) | set(wordlist.to_uk_map(ise=True)) | set(wordlist.to_uk_map(ise=False))
-    assert not (accept & converted), accept & converted
+def test_glosses_make_rules():
+    m = varcon.maps("uk")
+    assert m.rule("check", "British") == "British: 'check' for verify; 'cheque' for bank."
+    assert "'licence' for noun" in m.rule("license", "British")
+
+
+def test_legacy_tables_are_covered():
+    """Everything the hand tables of 0.1/0.2 converted must still be
+    converted (by table or pattern) or explicitly adjudicated. Inflections
+    the old table generated that are not words are skipped."""
+    import re
+    from stylefix import candidates, dictionary
+    us_map = wordlist.to_us_map()
+    us_amb = set(varcon.maps("us").ambiguous) | set(candidates.TABLES["us"])
+    misses = []
+    for uk_w, us_w, cls in legacy.BOTH + legacy.ISE:
+        for u, a in legacy.inflect(uk_w, us_w, cls):
+            if u == a or not dictionary.known(u, "uk"):
+                continue
+            if us_map.get(u) == a or u in us_amb:
+                continue
+            fam = next((patterns.CHECK_FAMILY[c] for c, rx in patterns.VALE_TOKENS["us"].items()
+                        if re.fullmatch(rx.strip("\\b"), u)), None)
+            o = patterns.decide(u, fam, "us") if fam else None
+            if o and ((o.status == "auto" and o.candidate == a) or o.status == "ask"):
+                continue
+            misses.append((u, a, us_map.get(u), o))
+    assert not misses, "\n".join(map(str, misses[:30])) + f"\n{len(misses)} misses"

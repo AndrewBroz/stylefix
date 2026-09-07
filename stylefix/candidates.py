@@ -85,5 +85,21 @@ TO_US.update(_pair("mom", "mum",
 TABLES = {"uk": TO_UK, "us": TO_US}
 
 
-def lookup(target: str, word: str) -> Candidate | None:
-    return TABLES[target].get(word.lower())
+VARIETY_NAME = {"us": "American", "uk": "British", "oxford": "British (Oxford)"}
+
+
+def lookup(target: str, word: str, oxford: bool = False) -> Candidate | None:
+    """Hand-written entry first; otherwise one built from VarCon's glosses."""
+    hit = TABLES[target].get(word.lower())
+    if hit:
+        return hit
+    from . import varcon
+    key = "oxford" if (target == "uk" and oxford) else target
+    m = varcon.maps(key)
+    forms = m.ambiguous.get(word.lower())
+    if not forms:
+        return None
+    rule = m.rule(word.lower(), VARIETY_NAME[key]) or (
+        f"{VARIETY_NAME[key]}: both spellings exist with different meanings; choose the one "
+        "that fits the sentence.")
+    return Candidate(tuple(sorted(forms, key=lambda f: (f == word.lower(), f))) + ("KEEP",), rule)

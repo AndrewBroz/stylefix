@@ -81,9 +81,10 @@ def build_config(workdir: Path, target: str, guide: str, oxford_ize: bool,
     lines += ["", "[*]", f"BasedOnStyles = {', '.join(styles)}"]
     if target == "uk":
         # Non-Oxford UK converts -ize to -ise; Oxford does the reverse.
-        lines.append("ToUK.Ise = NO" if oxford_ize else "ToUK.PatIse = NO")
-        if oxford_ize:
-            lines.append("ToUK.PatIze = NO")
+        off = ["Ise", "PatIze"] if oxford_ize else ["Oxford", "PatIse"]
+        for rule in sorted(STYLES_DIR.joinpath("ToUK").glob("*.yml")):
+            if any(rule.stem.startswith(o) for o in off):
+                lines.append(f"ToUK.{rule.stem} = NO")
     ini = workdir / ".vale.ini"
     ini.write_text("\n".join(lines) + "\n")
     return ini

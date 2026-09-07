@@ -10,7 +10,7 @@ def test_flags_only_other_variety_marker_words():
     assert "incentivized" not in words       # not a UK marker word, and fine
     assert "colour" not in words             # inside code
     uk = review_spellings("The color of the center was honored.\n", "uk")
-    assert {a.match for a in uk} == {"color", "honored"}   # en_GB lists "center"
+    assert {a.match for a in uk} == {"color", "center", "honored"}
 
 
 def test_accept_and_dedupe():

@@ -1,4 +1,4 @@
-.TH STYLEFIX 1 "September 2026" "stylefix 0.2.1" "User Commands"
+.TH STYLEFIX 1 "September 2026" "stylefix 0.3.0" "User Commands"
 .SH NAME
 stylefix \- regularize a Markdown file to US or UK English and a style guide
 .SH SYNOPSIS
@@ -24,16 +24,16 @@ The productive endings (-ise/-ize, -yse/-yze, -our/-or, -re/-er, -ll-/-l-)
 are handled as patterns: a hit is rewritten and confirmed against the
 shipped en_US and en_GB word lists, so coinages convert without being
 listed and words already valid in the target (advertise, precise, glamour)
-are left alone. Closed families (-ogue, ae/oe, -ence/-ense, irregulars)
-come from a curated table. Style preferences (towards/toward) are table
-swaps. Replacements preserve the original word's case.
+are left alone. Everything else comes from VarCon, the SCOWL project's
+table of American, British and Oxford spellings. Style preferences
+(towards/toward) are table swaps. Replacements preserve the original
+word's case.
 .TP
 .B adjudicated
 Words whose correct form depends on sense or part of speech
 (licence/license, practice/practise, programme/program, cheque/check,
-storey/story, tyre/tire, metre/meter, kerb/curb, enquiry/inquiry,
-draught/draft, judgement/judgment, learnt/learned, disc/disk, tonne/ton,
-whisky/whiskey, mum/mom), pattern hits whose rewrite is in no dictionary (a coinage,
+storey/story, tyre/tire, metre/meter and about 150 more, identified from
+VarCon's sense annotations and glossed with its notes), pattern hits whose rewrite is in no dictionary (a coinage,
 a name or a typo), and any replacement that sits inside a quotation or is
 capitalised mid-sentence (a possible proper name or title), are sent to
 the model as a multiple-choice question with the

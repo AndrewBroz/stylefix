@@ -1,24 +1,33 @@
-"""Base word lists from the SCOWL-derived Hunspell dictionaries (see dict/)."""
+"""Hunspell lookups (via spylls) over the shipped en_US and en_GB dictionaries.
+
+The dictionaries are the SCOWL-derived ones distributed with LibreOffice
+(see dict/LICENSE-*.txt). en_GB is Oxford-inclusive: it accepts both
+-ise and -ize spellings. en_US is smaller and lists no British forms.
+"""
 
 from __future__ import annotations
 
-import gzip
 from functools import lru_cache
 from pathlib import Path
 
+from spylls.hunspell import Dictionary
+
 DICT_DIR = Path(__file__).parent / "dict"
-VARIETY_FILE = {"us": "en_US.txt.gz", "uk": "en_GB.txt.gz"}
+VARIETY_FILE = {"us": "en_US", "uk": "en_GB"}
 
 
 @lru_cache(maxsize=None)
-def words(variety: str) -> frozenset[str]:
-    path = DICT_DIR / VARIETY_FILE[variety]
-    with gzip.open(path, "rt", encoding="utf-8") as f:
-        return frozenset(w.strip().lower() for w in f if w.strip())
+def _dictionary(variety: str) -> Dictionary:
+    return Dictionary.from_files(str(DICT_DIR / VARIETY_FILE[variety]))
 
 
+@lru_cache(maxsize=200_000)
 def known(word: str, variety: str) -> bool:
-    return word.lower() in words(variety)
+    """True if `word` (any case) is a valid word in the variety, including
+    inflected and affixed forms."""
+    if not word:
+        return False
+    return _dictionary(variety).lookup(word) or _dictionary(variety).lookup(word.lower())
 
 
 def known_anywhere(word: str) -> bool:

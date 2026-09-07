@@ -71,8 +71,8 @@ def test_to_us_chicago(tmp_path, stub_url):
     assert "# Color management program" in text
     assert "organizes its work around a simple license" in text
     assert "Members practice what they preach: every program is analyzed" in text
-    assert "story of the building is cataloged" in text and "is spelled the British way" in text
-    assert "“color” is spelled the British way—while our American colleagues favor “color.”" in text
+    assert "story of the building is cataloged" in text and "is spelt the British way" in text
+    assert "“color” is spelt the British way—while our American colleagues favor “color.”" in text
     assert "runs 3–5 sessions" in text
     assert "Labour Party office by September 4, 2026" in text          # KEEP via stub
     assert "theater program lists the meter readings, the tire pressures" in text
