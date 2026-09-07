@@ -233,11 +233,14 @@ def main(argv: list[str] | None = None) -> int:
         report_path.write_text(rep_md, encoding="utf-8")
     if args.changes or args.verbose:
         sys.stderr.write(changelog.render(text=text, target=args.target, applied=applied,
-                                          decisions=decisions, stats=stats, skipped=skipped))
+                                          decisions=decisions, stats=stats, skipped=skipped,
+                                          review=review))
     undecided = sum(1 for d in decisions if d.choice is None)
+    wrote = "" if args.dry_run else f" -> {output}"
+    if not args.dry_run and not args.no_report:
+        wrote += f", report {report_path}"
     print(f"stylefix: {len(applied)} replacement(s), {len(decisions)} adjudicated "
-          f"({undecided} undecided), {len(review)} alert(s) for review"
-          + ("" if args.dry_run else f" -> {output}, report {report_path}"), file=sys.stderr)
+          f"({undecided} undecided), {len(review)} alert(s) for review{wrote}", file=sys.stderr)
     return 0
 
 

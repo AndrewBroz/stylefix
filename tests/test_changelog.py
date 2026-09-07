@@ -25,3 +25,12 @@ def test_changelog_reports_kept_and_undecided():
     out = render(text="x\n\ncheck it\n", target="uk", applied=[], decisions=ds, stats=Stats())
     assert "kept after adjudication: 1" in out and "0.90: verb" in out
     assert "undecided (left as is, see report): 1" in out and "no model configured" in out
+
+
+def test_changelog_lists_review_alerts():
+    from stylefix.vale_runner import Alert
+    a = Alert(4, 1, 5, "Chicago.SerialComma", "a, b and c", "Chicago uses the serial comma: check 'a, b and c'.",
+              "suggestion", "", [])
+    out = render(text="", target="us", applied=[], decisions=[], stats=Stats(), review=[a, a])
+    assert "for review (not changed): 2" in out
+    assert "  Chicago.SerialComma" in out and "    L4    Chicago uses the serial comma" in out

@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from collections import defaultdict
+
 from .adjudicate import Decision
 from .apply import Edit
 from .conventions import Stats
+from .vale_runner import Alert
 
 
 def _context(text: str, edit: Edit, width: int = 28) -> str:
@@ -17,7 +20,8 @@ def _context(text: str, edit: Edit, width: int = 28) -> str:
 
 
 def render(*, text: str, target: str, applied: list[Edit], decisions: list[Decision],
-           stats: Stats, skipped: list[Edit] | None = None) -> str:
+           stats: Stats, skipped: list[Edit] | None = None,
+           review: list[Alert] | None = None) -> str:
     """Every change, grouped: word edits in document order, then punctuation
     counts, then adjudications that were kept or left undecided."""
     by_pos = {(d.item.line, d.item.start): d for d in decisions}
@@ -47,4 +51,13 @@ def render(*, text: str, target: str, applied: list[Edit], decisions: list[Decis
     punct = stats.as_dict()
     if punct:
         out.append("punctuation: " + ", ".join(f"{k.replace('_', ' ')} {v}" for k, v in punct.items()))
+    if review:
+        out.append(f"for review (not changed): {len(review)}")
+        by_check: dict[str, list[Alert]] = defaultdict(list)
+        for a in review:
+            by_check[a.check].append(a)
+        for check, items in sorted(by_check.items()):
+            out.append(f"  {check}")
+            for a in items:
+                out.append(f"    L{a.line:<4} {a.message}")
     return "\n".join(out) + "\n"

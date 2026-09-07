@@ -1,4 +1,4 @@
-.TH STYLEFIX 1 "September 2026" "stylefix 0.1.4" "User Commands"
+.TH STYLEFIX 1 "September 2026" "stylefix 0.1.5" "User Commands"
 .SH NAME
 stylefix \- regularize a Markdown file to US or UK English and a style guide
 .SH SYNOPSIS
@@ -88,7 +88,8 @@ Do not write a report.
 Print every change to standard error as it is made: line number, the word
 before and after, the surrounding text, and how it was decided (auto, or
 the model's confidence and reason). Words the model chose to keep and
-words left undecided follow, then punctuation counts.
+words left undecided follow, then punctuation counts, then every alert
+left for human review, grouped by check.
 .BR \-v
 implies this.
 .SS Model
