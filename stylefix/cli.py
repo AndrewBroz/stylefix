@@ -98,6 +98,10 @@ def build_parser() -> argparse.ArgumentParser:
                    help="style guide for dashes, serial commas, numerals, toward/towards and "
                         "punctuation placement: " + ", ".join(styleguides.choices()) +
                         " (default: chicago for us, oxford for uk; --list-styles explains each)")
+    t.add_argument("--abbreviation-nouns", choices=["default", "warn", "enforce", "off"], default="default",
+                   help="GPO and APA use 'U.S.' only as an adjective and write the noun out as "
+                        "'the United States'. default: warn when the guide has the rule; enforce: "
+                        "decide each 'the U.S.' with the model; off")
     t.add_argument("--list-styles", action="store_true",
                    help="describe every style guide and exit")
     t.add_argument("--oxford-ize", action="store_true",
@@ -289,15 +293,22 @@ def main(argv: list[str] | None = None) -> int:
                           timeout=args.timeout)
     edits, items, review = partition(text, alerts, args.target, guide, args.oxford_ize,
                                      adjudicate_style=ep is not None)
-    ab_edits, ab_items = abbreviations.plan(text, guide, next_id=len(items) + 1)
+    ab_edits, ab_items, ab_warnings = abbreviations.plan(text, guide, args.abbreviation_nouns,
+                                                         next_id=len(items) + 1)
     edits += ab_edits
+    title = styleguides.get(guide).title or "Style"
     if ep is not None:
         items += ab_items
     else:
         for it in ab_items:
-            review.append(Alert(it.line, it.start, it.end, f"{styleguides.get(guide).title}.Abbreviation",
-                                it.word, f"'{it.word}': sentence end or name? Needs a model to decide.",
+            review.append(Alert(it.line, it.start, it.end, f"{title}.Abbreviation", it.word,
+                                f"'{it.word}': sentence end, name, or initials? Needs a model to decide.",
                                 "suggestion", "", []))
+    for line, phrase in ab_warnings:
+        review.append(Alert(line, 1, 1, f"{title}.AbbreviationNoun", phrase,
+                            f"'{phrase}': {title} writes the noun out as 'the United States' and keeps "
+                            f"the abbreviation for adjectives. --abbreviation-nouns enforce applies it.",
+                            "suggestion", "", []))
     if items and ep is None:
         print(f"stylefix: no model endpoint available (--llm {args.llm}); "
               f"{len(items)} ambiguous word(s) will be listed for review", file=sys.stderr)

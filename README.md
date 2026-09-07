@@ -80,23 +80,27 @@ every other British form.
 | `guardian` | Guardian/Observer, UK journalism | spaced en | omitted unless needed | 10 | towards | logical (unchanged) | US, UK; PhD; 10am; v; eg, ie, etc |
 | `none` | no guide | unchanged | no rule | no rule | no rule | unchanged | unchanged |
 
-**Abbreviations** are handled as a class: the two-letter country
-abbreviations (US, UK, UN, USA), PhD, clock times, vs., and the Latin tags
-e.g., i.e. and etc. each take the guide's form wherever they appear. Every
-form is position-independent except one: when periods are dropped, a
-"U.S." followed by a capitalised word is either the end of its sentence
-(the sentence keeps its period: "in the US. The") or a name ("US Policy"),
-so those occurrences are adjudicated rather than guessed. EU never takes
-periods in any guide and is left alone.
+**Abbreviations** follow the guides' general rules, not a word list.
+Chicago's rule (10.4), shared by Oxford and the Guardian, is that an
+abbreviation in full capitals takes no periods, two letters or more: US,
+UK, EU, NATO, PhD, DC. It is applied to every period-group of capitals.
+The hazard is personal initials ("J.K. Rowling" keeps its periods), which
+look identical; so a group followed by a capitalised word is adjudicated,
+with the readings shown as they would print, and the sentence-end case
+("in the U.S. The ...") is handled the same way. AP's rule is the reverse
+for "most two-letter abbreviations" (U.S., U.N., U.K., B.A., B.C.), with
+named exceptions (EU, GI, ID) and none in longer ones (FBI, NATO); since AP
+writes AI, IT and TV without periods, the rule is applied by category:
+countries, places, degrees and eras. GPO follows AP's forms; APA keeps
+"U.S." but writes degrees without periods (PhD, MA). Clock times, vs., and
+e.g., i.e., etc. take each guide's form.
 
-**What `none` means.** It is not "no changes". Spelling still converts, and
-the target variety's own punctuation still applies: straight quotes become
-curly with the variety's primary style (double for US, single for UK),
-apostrophes are fixed, number ranges get en dashes, and dates take the
-variety's order. What `none` leaves exactly as written is everything a
-style guide would rule on: parenthetical dashes, serial commas, numerals
-versus words, toward/towards, and whether commas and periods sit inside
-closing quotes.
+**The noun rule.** GPO and APA use "U.S." only as an adjective ("U.S.
+policy") and write the noun out ("the United States"). Because that is a
+part-of-speech question, it is a warning by default under those guides
+(each likely noun use is listed for review) and an enforcement on request:
+`--abbreviation-nouns enforce` puts every "the U.S." to the model, which
+chooses "United States", the adjective form, or KEEP. `off` silences it.
 
 Dashes, toward/towards and punctuation placement are applied outright.
 Serial commas and numerals need judgement (is "attacks, intentional and

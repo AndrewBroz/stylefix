@@ -1,4 +1,4 @@
-.TH STYLEFIX 1 "September 2026" "stylefix 0.5.0" "User Commands"
+.TH STYLEFIX 1 "September 2026" "stylefix 0.6.0" "User Commands"
 .SH NAME
 stylefix \- regularize a Markdown file to US or UK English and a style guide
 .SH SYNOPSIS
@@ -89,11 +89,21 @@ quotes in the variety's primary style, apostrophes, en dashes in ranges,
 date order). Parenthetical dashes, serial commas, numerals, toward/towards
 and punctuation placement are left exactly as written.
 .PP
-Abbreviations are handled as a class (US/U.S., UK, UN, USA, PhD, clock
-times, vs., e.g., i.e., etc.), each taking the guide's form wherever it
-appears. A "U.S." followed by a capitalised word, when periods are being
-dropped, may end its sentence or begin a name; those occurrences are
-adjudicated.
+Abbreviations follow the guides' general rules. Chicago, Oxford and the
+Guardian: no periods in any abbreviation in capitals (US, EU, NATO, PhD,
+DC), applied to every period-group of capitals; a group followed by a
+capitalised word may end its sentence, continue a name, or be a person's
+initials, and is adjudicated. AP and GPO: periods in two-letter country,
+place, degree and era abbreviations (U.S., U.K., D.C., B.A., Ph.D., B.C.),
+none in EU or in longer ones. APA: U.S. with periods, degrees without.
+Clock times, vs., e.g., i.e. and etc. take each guide's form.
+.PP
+GPO and APA use U.S. only as an adjective and write the noun as "the
+United States". By default under those guides each likely noun use is
+listed for review;
+.B \-\-abbreviation\-nouns enforce
+has the model decide each "the U.S." (noun: United States; adjective: keep
+the abbreviation).
 .PP
 Dashes, toward/towards and punctuation placement are applied outright.
 Serial-comma and numeral hits are adjudicated: the model chooses between one
@@ -111,6 +121,10 @@ punctuation placement. One of chicago (Chicago Manual of Style; US
 default), gpo (US Government Publishing Office Style Manual), ap
 (Associated Press), apa (APA 7th), oxford (New Hart's Rules; UK default),
 guardian (Guardian/Observer), none. Spelling always follows \-\-target.
+.TP
+.BR \-\-abbreviation\-nouns " {default|warn|enforce|off}"
+The GPO/APA rule that U.S. is an adjective only. default: warn when the
+guide has the rule.
 .TP
 .B \-\-list\-styles
 Describe every style guide and exit.

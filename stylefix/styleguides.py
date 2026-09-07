@@ -34,7 +34,7 @@ GUIDES: dict[str, StyleGuide] = {g.name: g for g in [
                dash="em", serial_comma="require", spell_out_below=101, adverb_s="drop",
                punctuation_inside_quotes=True, variety="us",
                url="https://www.chicagomanualofstyle.org/",
-               abbreviations="US, UK, EU without periods; PhD; 10 a.m.; vs.; e.g."),
+               abbreviations="no periods in capital abbreviations (US, UK, EU, PhD, DC); 10 a.m.; vs.; e.g."),
     StyleGuide("gpo", "GPO",
                "U.S. Government Publishing Office Style Manual: the federal standard. "
                "Unspaced em dash, serial comma, numerals from 10, toward, "
@@ -42,7 +42,7 @@ GUIDES: dict[str, StyleGuide] = {g.name: g for g in [
                dash="em", serial_comma="require", spell_out_below=10, adverb_s="drop",
                punctuation_inside_quotes=True, variety="us",
                url="https://www.govinfo.gov/collection/gpo-style-manual",
-               abbreviations="U.S., U.K. with periods; Ph.D.; 10 a.m.; vs.; e.g."),
+               abbreviations="U.S., U.K., U.N., D.C., B.A., Ph.D. with periods (EU, NATO without); noun is 'the United States'; 10 a.m.; vs.; e.g."),
     StyleGuide("ap", "AP",
                "Associated Press Stylebook: journalism. Spaced em dash, no serial "
                "comma in a simple series, numerals from 10, toward, punctuation "
@@ -50,7 +50,7 @@ GUIDES: dict[str, StyleGuide] = {g.name: g for g in [
                dash="em-spaced", serial_comma="omit", spell_out_below=10, adverb_s="drop",
                punctuation_inside_quotes=True, variety="us",
                url="https://www.apstylebook.com/",
-               abbreviations="U.S., U.K. with periods in text; Ph.D.; 10 a.m.; vs.; e.g."),
+               abbreviations="periods in two-letter country, place, degree and era abbreviations (U.S., U.K., D.C., B.A., Ph.D., B.C.); EU, GI, ID excepted; 10 a.m.; vs.; e.g."),
     StyleGuide("apa", "APA",
                "APA Publication Manual (7th ed.): academic and policy research. "
                "Unspaced em dash, serial comma, numerals from 10, punctuation "
@@ -58,7 +58,7 @@ GUIDES: dict[str, StyleGuide] = {g.name: g for g in [
                dash="em", serial_comma="require", spell_out_below=10, adverb_s=None,
                punctuation_inside_quotes=True, variety="us",
                url="https://apastyle.apa.org/",
-               abbreviations="U.S. with periods (as an adjective); PhD; 10 a.m.; vs.; e.g."),
+               abbreviations="U.S., U.K. with periods, as adjectives only (noun: the United States); degrees without (PhD, MA); 10 a.m.; vs.; e.g."),
     StyleGuide("oxford", "Oxford",
                "New Hart's Rules (Oxford): spaced en dash, Oxford comma, numbers "
                "up to one hundred spelled out in general text, towards/amongst, "
@@ -66,7 +66,7 @@ GUIDES: dict[str, StyleGuide] = {g.name: g for g in [
                dash="en-spaced", serial_comma="require", spell_out_below=101, adverb_s="keep",
                punctuation_inside_quotes=False, variety="uk",
                url="https://global.oup.com/academic/product/new-harts-rules-9780199570027",
-               abbreviations="US, UK without points; PhD; 10 a.m.; vs; e.g."),
+               abbreviations="no points in capital abbreviations (US, UK, EU, PhD); 10 a.m.; vs; e.g."),
     StyleGuide("guardian", "Guardian",
                "Guardian and Observer style guide: UK journalism. Spaced en dash, "
                "no serial comma unless needed, numerals from 10, towards, logical "
@@ -74,7 +74,7 @@ GUIDES: dict[str, StyleGuide] = {g.name: g for g in [
                dash="en-spaced", serial_comma="omit", spell_out_below=10, adverb_s="keep",
                punctuation_inside_quotes=False, variety="uk",
                url="https://www.theguardian.com/guardian-observer-style-guide-a",
-               abbreviations="US, UK; PhD; 10am; v; eg, ie, etc without points"),
+               abbreviations="no points in capital abbreviations; 10am; v; eg, ie, etc without points"),
     StyleGuide("none", "",
                "No style guide. Spelling and the target variety's punctuation "
                "conventions only: curly quotes with the variety's primary style, "
