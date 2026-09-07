@@ -3,6 +3,16 @@ revision = 3
 requires-python = ">=3.11"
 
 [[package]]
+name = "adjudicate"
+version = "0.1.0"
+source = { editable = "../adjudicate" }
+
+[package.metadata]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest", specifier = ">=8" }]
+
+[[package]]
 name = "colorama"
 version = "0.4.6"
 source = { registry = "https://pypi.org/simple" }
@@ -77,6 +87,7 @@ name = "stylefix"
 version = "0.4.1"
 source = { editable = "." }
 dependencies = [
+    { name = "adjudicate" },
     { name = "spylls" },
 ]
 
@@ -86,7 +97,10 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "spylls", specifier = ">=0.1.7" }]
+requires-dist = [
+    { name = "adjudicate", editable = "../adjudicate" },
+    { name = "spylls", specifier = ">=0.1.7" },
+]
 
 [package.metadata.requires-dev]
 dev = [{ name = "pytest", specifier = ">=8" }]

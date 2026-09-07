@@ -1,9 +1,9 @@
 [project]
 name = "stylefix"
-version = "0.4.1"
+version = "0.4.2"
 description = "Regularize a Markdown file to US or UK English and a style guide, using Vale plus a local LLM for the ambiguous cases."
 requires-python = ">=3.11"
-dependencies = ["spylls>=0.1.7"]
+dependencies = ["spylls>=0.1.7", "adjudicate"]
 
 [project.scripts]
 stylefix = "stylefix.cli:main"
@@ -15,6 +15,9 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["stylefix"]
 include = ["stylefix/**/*.txt", "stylefix/**/*.yml", "stylefix/dict/*"]
+
+[tool.uv.sources]
+adjudicate = { path = "../adjudicate", editable = true }
 
 [dependency-groups]
 dev = ["pytest>=8"]

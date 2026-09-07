@@ -12,13 +12,7 @@ from dataclasses import dataclass, field
 MONTHS = ("January|February|March|April|May|June|July|August|September|"
           "October|November|December")
 
-_FENCE = re.compile(r"^(```|~~~)[^\n]*\n.*?^\1[ \t]*$", re.M | re.S)
-_INLINE_CODE = re.compile(r"(`+)[^`\n]*?\1")
-_LINK_DEST = re.compile(r"\]\([^)\s]*(?:\s+\"[^\"]*\")?\)")
-_URL = re.compile(r"<?(?:https?|ftp|mailto):[^\s>)]+>?")
-_FRONT = re.compile(r"\A---\n.*?\n---\n", re.S)
-_HTML_COMMENT = re.compile(r"<!--.*?-->", re.S)
-_HTML_TAG = re.compile(r"</?[A-Za-z][^<>\n]*>")
+from adjudicate.context import map_prose, prose_regions, protected_spans  # noqa: F401
 
 
 @dataclass
@@ -33,43 +27,6 @@ class Stats:
     def as_dict(self) -> dict[str, int]:
         return {k: v for k, v in self.__dict__.items() if v}
 
-
-def protected_spans(text: str) -> list[tuple[int, int]]:
-    spans = []
-    m = _FRONT.match(text)
-    if m:
-        spans.append((0, m.end()))
-    for rx in (_FENCE, _INLINE_CODE, _LINK_DEST, _URL, _HTML_COMMENT, _HTML_TAG):
-        spans.extend(m.span() for m in rx.finditer(text))
-    spans.sort()
-    merged: list[tuple[int, int]] = []
-    for s, e in spans:
-        if merged and s <= merged[-1][1]:
-            merged[-1] = (merged[-1][0], max(merged[-1][1], e))
-        else:
-            merged.append((s, e))
-    return merged
-
-
-def prose_regions(text: str) -> list[tuple[int, int]]:
-    regions, cursor = [], 0
-    for s, e in protected_spans(text):
-        if s > cursor:
-            regions.append((cursor, s))
-        cursor = e
-    if cursor < len(text):
-        regions.append((cursor, len(text)))
-    return regions
-
-
-def map_prose(text: str, fn) -> str:
-    out, cursor = [], 0
-    for s, e in prose_regions(text):
-        out.append(text[cursor:s])
-        out.append(fn(text[s:e]))
-        cursor = e
-    out.append(text[cursor:])
-    return "".join(out)
 
 
 # --- quotes ---------------------------------------------------------------
