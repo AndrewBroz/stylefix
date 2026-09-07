@@ -31,3 +31,13 @@ def test_oxford_ize_split():
     assert "organise" in wordlist.to_uk_map(ise=True).values()
     assert "organize" not in wordlist.to_uk_map(ise=False)
     assert wordlist.to_uk_map(ise=False)["analyze"] == "analyse"
+
+
+def test_accept_list_does_not_shadow_word_table():
+    """A word in accept.txt is never flagged, so it must not be one that the
+    US/UK tables convert; otherwise the conversion is silently suppressed."""
+    from pathlib import Path
+    accept = {l.strip().lower() for l in (wordlist.STYLES_DIR.parent / "accept.txt").read_text().splitlines()
+              if l.strip() and not l.startswith("#")}
+    converted = set(wordlist.to_us_map()) | set(wordlist.to_uk_map(ise=True)) | set(wordlist.to_uk_map(ise=False))
+    assert not (accept & converted), accept & converted
