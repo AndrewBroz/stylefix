@@ -30,8 +30,8 @@ def test_punctuation_placement_per_guide():
 
 
 def test_serial_comma_and_numbers_rules():
-    assert "\\w+, \\w+ (?:and|or)" in vale_rules(get("chicago"))["SerialComma.yml"]
-    assert "\\w+, \\w+, (?:and|or)" in vale_rules(get("ap"))["SerialComma.yml"]
+    assert ", [^,.;:!?\\n]+ (?:and|or)" in vale_rules(get("chicago"))["SerialComma.yml"]
+    assert ", [^,.;:!?\\n]+, (?:and|or)" in vale_rules(get("ap"))["SerialComma.yml"]
     assert "[1-9]|[1-9]\\d" in vale_rules(get("chicago"))["Numbers.yml"]
     assert "(?:[1-9])" in vale_rules(get("gpo"))["Numbers.yml"]
     assert "Toward.yml" in vale_rules(get("gpo")) and "Towards.yml" in vale_rules(get("guardian"))

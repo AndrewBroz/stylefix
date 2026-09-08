@@ -127,18 +127,22 @@ def vale_rules(g: StyleGuide) -> dict[str, str]:
                                 f"message: \"British usage prefers '%s' to '%s'.\"\n"
                                 "level: warning\nignorecase: true\naction:\n  name: replace\nswap:\n"
                                 "  toward: towards\n  afterward: afterwards\n")
+    # A series: two or more comma-separated items (multi-word, numbered or
+    # bold allowed) then the last item after and/or. The adjudicator decides
+    # whether it is a list of three or an aside; this only finds candidates.
+    item = "[^,.;:!?\\n]+"
     if g.serial_comma == "require":
-        rules["SerialComma.yml"] = (head + "# Heuristic: \"a, b and c\" without the serial comma. Flag only.\n"
+        rules["SerialComma.yml"] = (head + "# A series whose last item follows 'and'/'or' without a comma. Adjudicated.\n"
                                     "extends: existence\n"
                                     f"message: \"{g.title} uses the serial comma: check '%s'.\"\n"
                                     "level: suggestion\nnonword: true\ntokens:\n"
-                                    "  - '\\w+, \\w+ (?:and|or) \\w+'\n")
+                                    f"  - '{item}, {item} (?:and|or) {item}'\n")
     elif g.serial_comma == "omit":
-        rules["SerialComma.yml"] = (head + "# Heuristic: \"a, b, and c\" with a serial comma in a simple series. Flag only.\n"
+        rules["SerialComma.yml"] = (head + "# A series with a comma before 'and'/'or'. Adjudicated.\n"
                                     "extends: existence\n"
                                     f"message: \"{g.title} omits the serial comma in a simple series: check '%s'.\"\n"
                                     "level: suggestion\nnonword: true\ntokens:\n"
-                                    "  - '\\w+, \\w+, (?:and|or) \\w+'\n")
+                                    f"  - '{item}, {item}, (?:and|or) {item}'\n")
     if g.spell_out_below:
         hi = g.spell_out_below - 1
         rx = r"[1-9]|[1-9]\d" if hi >= 99 else r"[1-9]"
