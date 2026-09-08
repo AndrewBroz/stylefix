@@ -52,6 +52,17 @@ _LAST_ITEM = re.compile(rf"^{_W}(?:[ \t]+{_W}){{0,2}}")     # context only; the 
 _SENTENCE_BREAK = re.compile(r"[.;:!?]\s|\n")
 
 
+REQUIRE_RULE = (
+    "{t} puts a comma before 'and'/'or' in a series of three or more items (Chicago 6.19). "
+    "Grammar first: 'X, Y and Z' with a single conjunction is a three-item series; a two-item "
+    "series has no comma at all, so 'Y and Z are one item' is not a reason to KEEP unless the text "
+    "actually reads 'X and Y and Z'. If an item next to the final conjunction is itself compound "
+    "('alerts, halting and correction mechanisms'; 'toast and marmalade and tea'), that is the very "
+    "case the serial comma exists for: choose the version with the comma. KEEP only if the first "
+    "comma introduces an aside or restatement rather than a list ('attacks, intentional and "
+    "unintentional'; 'my parents, Martin Amis and JK Rowling' where the names ARE the parents), "
+    "or if the conjunction joins two independent clauses.")
+
 OMIT_RULES = {
     "guardian": (
         "The Guardian and Observer style guide ('Oxford comma' entry) says: a comma before the "
@@ -175,13 +186,7 @@ def candidate(check: str, match: str, guide: StyleGuide) -> tuple[str, str] | No
             m = _SERIAL_MISSING.match(match)
             if not m:
                 return None
-            return (m.group(1) + "," + m.group(2),
-                    f"{t} puts a comma before 'and'/'or' in a list of three or more items. "
-                    "Choose the version with the comma only if this is such a list. KEEP if the "
-                    "first comma introduces an aside or a restatement ('attacks, intentional and "
-                    "unintentional'), if the words after the conjunction belong to the item "
-                    "before it ('bread and butter'), or if the conjunction joins two clauses "
-                    "rather than list items.")
+            return (m.group(1) + "," + m.group(2), REQUIRE_RULE.format(t=t))
         if guide.serial_comma == "omit":
             m = _SERIAL_PRESENT.match(match)
             if not m:

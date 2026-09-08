@@ -9,7 +9,7 @@ def test_number_words():
 
 def test_serial_comma_candidates():
     rep, rule = candidate("Chicago.SerialComma", "attacks, intentional and unintentional", get("chicago"))
-    assert rep == "attacks, intentional, and unintentional" and "KEEP if" in rule
+    assert rep == "attacks, intentional, and unintentional" and "KEEP only if" in rule
     rep, rule = candidate("AP.SerialComma", "red, white, and blue", get("ap"))
     assert rep == "red, white and blue"
     rep, _ = candidate("Guardian.SerialComma",
@@ -100,3 +100,10 @@ def test_two_series_in_one_sentence():
     assert len(back) == 4
     new2, skipped = apply_edits(new, [f.edit for f in back])
     assert not skipped and new2 == text
+
+
+def test_require_rule_states_the_grammar():
+    rep, rule = candidate("Chicago.SerialComma", "create alerts, halting and correction mechanisms", get("chicago"))
+    assert rep == "create alerts, halting, and correction mechanisms"
+    assert "two-item series has no comma" in rule and "6.19" in rule
+    assert "attacks, intentional and unintentional" in rule
