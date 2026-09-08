@@ -50,6 +50,9 @@ _CONJ_COMMA = re.compile(r", (?:and|or) ")
 _PRECEDING_ITEMS = re.compile(rf"{_ITEM}, {_ITEM}$")
 _LAST_ITEM = re.compile(rf"^{_W}(?:[ \t]+{_W}){{0,2}}")     # context only; the edit is at the comma
 _SENTENCE_BREAK = re.compile(r"[.;:!?]\s|\n")
+# "how and under what conditions", "when and where": the conjunction pairs
+# question words inside one item; it is not a series.
+_PAIRED_QUESTION = re.compile(r"\b(?:how|when|where|why|whether|if|what|which|who|whom)$", re.I)
 
 
 REQUIRE_RULE = (
@@ -61,7 +64,9 @@ REQUIRE_RULE = (
     "case the serial comma exists for: choose the version with the comma. KEEP only if the first "
     "comma introduces an aside or restatement rather than a list ('attacks, intentional and "
     "unintentional'; 'my parents, Martin Amis and JK Rowling' where the names ARE the parents), "
-    "or if the conjunction joins two independent clauses.")
+    "or if the conjunction joins two independent clauses, or if a later ', and'/', or' in the "
+    "same sentence closes a larger list and this conjunction merely joins two parts of one item "
+    "('which to involve, how and under what conditions reporting is shared, and at which parts').")
 
 OMIT_RULES = {
     "guardian": (
@@ -136,6 +141,8 @@ def find_series(text: str, guide: StyleGuide) -> list[Series]:
             last_end = m.end()
             items = _PRECEDING_ITEMS.search(head)
             if not items:
+                continue
+            if _PAIRED_QUESTION.search(head.rstrip()):
                 continue
             tail = _LAST_ITEM.match(region[m.end():])
             if not tail:

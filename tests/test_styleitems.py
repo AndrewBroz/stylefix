@@ -107,3 +107,13 @@ def test_require_rule_states_the_grammar():
     assert rep == "create alerts, halting, and correction mechanisms"
     assert "two-item series has no comma" in rule and "6.19" in rule
     assert "attacks, intentional and unintentional" in rule
+
+
+def test_paired_question_words_are_not_a_series():
+    from stylefix.styleitems import find_series
+    text = ("It will include which organizations to involve, how and under what conditions reporting "
+            "is shared, and at which parts levers will be deployed. Decide when and where to meet, who "
+            "and why. Ham, eggs and chips.\n")
+    found = find_series(text, get("chicago"))
+    assert [f.candidate[-20:] for f in found] == ["ham, eggs, and chips".title()[-20:]] or \
+        [f.text for f in found] == ["Ham, eggs and chips"]
