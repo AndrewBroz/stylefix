@@ -31,7 +31,7 @@ class StubModel(BaseHTTPRequestHandler):
             if line.startswith("Item "):
                 _, num, _, _, word, *_ = line.split(" ", 5)
                 word = word.strip('"“”—').lower()
-                options = line.split("options: ")[1].split(" | ")
+                options = [o.split("] ", 1)[-1] for o in line.split("options: ")[1].split(" | ")]
                 choice = self.answers.get(word, "KEEP")
                 phrase = line.split('word: "')[1].split('" — options')[0]
                 if ", " in phrase:

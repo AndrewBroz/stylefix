@@ -17,7 +17,7 @@ def test_parse_response_variants():
 
 def test_render_batch():
     s = render_batch([item()])
-    assert 'Item 1 — word: "license" — options: licence | license | KEEP' in s
+    assert 'Item 1 — word: "license" — options: [1] licence | [2] license | KEEP' in s
     assert "Context: a [[license]] b" in s
 
 
