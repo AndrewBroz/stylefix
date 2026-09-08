@@ -49,6 +49,31 @@ _LAST_CONJ_NO_COMMA = re.compile(r"([^,\s])(\s+(?:and|or)\s)(?!.*\s(?:and|or)\s)
 _LAST_CONJ_COMMA = re.compile(r",(\s+(?:and|or)\s)(?!.*,\s+(?:and|or)\s)", re.S)
 
 
+OMIT_RULES = {
+    "guardian": (
+        "The Guardian and Observer style guide ('Oxford comma' entry) says: a comma before the "
+        "final 'and' in lists: straightforward ones ('he ate ham, eggs and chips') do not need one, "
+        "but sometimes it can help the reader ('he ate cereal, kippers, bacon, eggs, toast and "
+        "marmalade, and tea'), and sometimes it is essential: compare 'I dedicate this book to my "
+        "parents, Martin Amis, and JK Rowling' with '... my parents, Martin Amis and JK Rowling'. "
+        "Here no item adjacent to the final 'and' contains its own 'and'. Choose the version without "
+        "the comma unless the last two items could be read as an apposition (the second naming or "
+        "explaining the first, as with the parents), or the conjunction joins two independent "
+        "clauses rather than list items; then KEEP. An 'and' elsewhere in the list does not by "
+        "itself call for the comma."),
+    "ap": (
+        "AP Stylebook: no comma before the conjunction in a simple series ('the flag is red, white "
+        "and blue'); use one when an element of the series contains a conjunction or when the "
+        "series is made up of complex phrases. Here no item adjacent to the final conjunction "
+        "contains its own. Choose the version without the comma unless the items are long complex "
+        "phrases or the last two could be read as one; then KEEP."),
+    "default": (
+        "{t} omits the comma before 'and'/'or' in a simple series. Choose the version without it "
+        "unless the last two items could be misread as one, or the conjunction joins two "
+        "independent clauses; then KEEP."),
+}
+
+
 @dataclass
 class Series:
     start: int          # absolute offsets of the matched series
@@ -141,13 +166,13 @@ def candidate(check: str, match: str, guide: StyleGuide) -> tuple[str, str] | No
             m = _SERIAL_PRESENT.match(match)
             if not m:
                 return None
-            return (m.group(1) + m.group(2),
-                    f"{t} omits the comma before 'and'/'or' in a simple series. Choose the version "
-                    "without it when the items are plain terms or phrases ('monitoring, halting, "
-                    "correction and timely resumption'; 'business, financial stability and US "
-                    "leadership'). KEEP if any item itself contains 'and'/'or', if the last item "
-                    "would otherwise read as part of the previous one, or if the conjunction "
-                    "joins two independent clauses.")
+            # The guide's mechanical case: a compound item immediately before
+            # the final conjunction ("toast and marmalade, and tea") keeps the
+            # comma. No judgement needed; leave it and ask nothing.
+            penultimate = m.group(1).rsplit(", ", 1)[-1]
+            if re.search(r"\b(?:and|or)\b", penultimate):
+                return None
+            return (m.group(1) + m.group(2), OMIT_RULES.get(guide.name, OMIT_RULES["default"]).format(t=t))
         return None
     if rule == "Numbers":
         m = _NUMBER.match(match)

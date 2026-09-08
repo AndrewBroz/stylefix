@@ -52,3 +52,27 @@ def test_find_series_handles_markup_entities_numbers():
     new2, skipped = apply_edits(new, [f.edit for f in found])
     assert not skipped and "monitor, detect, and correct&#32;**unsanctioned" in new2
     assert "2) model containment, or 3) monitoring**" in new2
+
+
+def test_guardian_oxford_comma_follows_the_guide():
+    """The three verdicts from the memo, scored against the Guardian entry."""
+    g = get("guardian")
+    # compound item adjacent to the final 'and': kept, mechanically
+    assert candidate("Guardian.SerialComma",
+                     "for defection on model development and release safety, including potential "
+                     "tariffs and sanctions, and gating chip access on compliance", g) is None
+    # an 'and' inside the LAST item: straightforward list, comma offered for removal
+    rep, rule = candidate("Guardian.SerialComma",
+                          "leak financial data, jeopardize stock market stability, and damage the US AI "
+                          "advantage and reputation", g)
+    assert rep.endswith("stability and damage the US AI advantage and reputation")
+    # an 'and' in the FIRST item: straightforward list
+    rep, rule = candidate("Guardian.SerialComma",
+                          "more trustworthy and reliable consumer products, financial stability, and "
+                          "more predictable AI deployments", g)
+    assert rep.endswith("financial stability and more predictable AI deployments")
+    assert "Martin Amis" in rule and "toast and marmalade" in rule
+    # the guide's own examples
+    assert candidate("Guardian.SerialComma", "cereal, kippers, bacon, eggs, toast and marmalade, and tea", g) is None
+    rep, _ = candidate("Guardian.SerialComma", "ham, eggs, and chips", g)
+    assert rep == "ham, eggs and chips"
