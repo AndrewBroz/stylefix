@@ -43,10 +43,13 @@ _NUMBER = re.compile(r"^(\s)(\d{1,3})(\s)$")
 # HTML entity, but never sentence punctuation or a comma.
 _W = r"(?:&#?\w+;|[^\s,.;:!?])+"
 _ITEM = rf"{_W}(?:[ \t]+{_W}){{0,7}}"
-SERIES_MISSING = re.compile(rf"{_ITEM}, {_ITEM} (?:and|or) {_ITEM}")
-SERIES_PRESENT = re.compile(rf"{_ITEM}, {_ITEM}, (?:and|or) {_ITEM}")
-_LAST_CONJ_NO_COMMA = re.compile(r"([^,\s])(\s+(?:and|or)\s)(?!.*\s(?:and|or)\s)", re.S)
-_LAST_CONJ_COMMA = re.compile(r",(\s+(?:and|or)\s)(?!.*,\s+(?:and|or)\s)", re.S)
+# Every conjunction is examined on its own: the items are found by looking
+# back from it, so two series in one sentence are two questions.
+_CONJ_NO_COMMA = re.compile(r"(?<=[^,\s]) (?:and|or) ")
+_CONJ_COMMA = re.compile(r", (?:and|or) ")
+_PRECEDING_ITEMS = re.compile(rf"{_ITEM}, {_ITEM}$")
+_LAST_ITEM = re.compile(rf"^{_W}(?:[ \t]+{_W}){{0,2}}")     # context only; the edit is at the comma
+_SENTENCE_BREAK = re.compile(r"[.;:!?]\s|\n")
 
 
 OMIT_RULES = {
@@ -107,28 +110,42 @@ def find_series(text: str, guide: StyleGuide) -> list[Series]:
     """Every series the guide has an opinion about, with its minimal edit."""
     if guide.serial_comma not in ("require", "omit"):
         return []
-    rx = SERIES_MISSING if guide.serial_comma == "require" else SERIES_PRESENT
+    require = guide.serial_comma == "require"
+    conj_rx = _CONJ_NO_COMMA if require else _CONJ_COMMA
     out: list[Series] = []
     for rs, re_ in _regions(text):
-        for m in rx.finditer(text, rs, re_):
-            raw = m.group(0)
-            if guide.serial_comma == "require":
-                c = list(_LAST_CONJ_NO_COMMA.finditer(raw))
-                if not c:
-                    continue
-                pos = m.start() + c[-1].end(1)
+        region = text[rs:re_]
+        last_end = 0
+        for m in conj_rx.finditer(region):
+            # the sentence so far, up to this conjunction and after the previous one
+            head = region[:m.start()]
+            brk = list(_SENTENCE_BREAK.finditer(head))
+            cut = max(brk[-1].end() if brk else 0, last_end)
+            head = head[cut:]
+            last_end = m.end()
+            items = _PRECEDING_ITEMS.search(head)
+            if not items:
+                continue
+            tail = _LAST_ITEM.match(region[m.end():])
+            if not tail:
+                continue
+            s_abs = rs + cut + items.start()
+            e_abs = rs + m.end() + tail.end()
+            raw = text[s_abs:e_abs]
+            conj_pos = rs + m.start()                        # offset of the comma (omit) or the gap (require)
+            if require:
+                pos = conj_pos                               # right after the last item, before the space
                 line, col = _line_col(text, pos)
-                edit = Edit(line, col, col - 1, "", ",", "style")          # insertion
-                cand = raw[:c[-1].end(1)] + "," + raw[c[-1].end(1):]
+                edit = Edit(line, col, col - 1, "", ",", "style")
+                k = pos - s_abs
+                cand = raw[:k] + "," + raw[k:]
             else:
-                c = list(_LAST_CONJ_COMMA.finditer(raw))
-                if not c:
-                    continue
-                pos = m.start() + c[-1].start()
+                pos = conj_pos                               # the comma itself
                 line, col = _line_col(text, pos)
-                edit = Edit(line, col, col, ",", "", "style")                # deletion
-                cand = raw[:c[-1].start()] + raw[c[-1].start() + 1:]
-            out.append(Series(m.start(), m.end(), raw, edit, cand))
+                edit = Edit(line, col, col, ",", "", "style")
+                k = pos - s_abs
+                cand = raw[:k] + raw[k + 1:]
+            out.append(Series(s_abs, e_abs, raw, edit, cand))
     return out
 
 

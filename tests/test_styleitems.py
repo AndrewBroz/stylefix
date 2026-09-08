@@ -83,3 +83,20 @@ def test_series_items_skip_mechanically_settled_cases():
     text = "He ate cereal, kippers, toast and marmalade, and tea. Then ham, eggs, and chips.\n"
     items, edits = series_items(text, get("guardian"))
     assert [i.word for i in items] == ["Then ham, eggs, and chips"]
+
+
+def test_two_series_in_one_sentence():
+    from adjudicate import apply_edits
+    from stylefix.styleitems import find_series
+    text = ("Procedures that create alerts, halting, and correction mechanisms during frontier AI "
+            "training, testing, and deployment. Red, white, and blue; salt, pepper, and oil.\n")
+    found = find_series(text, get("guardian"))
+    assert len(found) == 4
+    new, skipped = apply_edits(text, [f.edit for f in found])
+    assert not skipped
+    assert new == ("Procedures that create alerts, halting and correction mechanisms during frontier AI "
+                   "training, testing and deployment. Red, white and blue; salt, pepper and oil.\n")
+    back = find_series(new, get("chicago"))
+    assert len(back) == 4
+    new2, skipped = apply_edits(new, [f.edit for f in back])
+    assert not skipped and new2 == text
