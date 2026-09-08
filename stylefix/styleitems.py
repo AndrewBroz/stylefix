@@ -60,7 +60,8 @@ OMIT_RULES = {
         "the comma unless the last two items could be read as an apposition (the second naming or "
         "explaining the first, as with the parents), or the conjunction joins two independent "
         "clauses rather than list items; then KEEP. An 'and' elsewhere in the list does not by "
-        "itself call for the comma."),
+        "itself call for the comma, and neither does numbering of the items (1) ..., 2) ..., "
+        "or 3) ...)."),
     "ap": (
         "AP Stylebook: no comma before the conjunction in a simple series ('the flag is red, white "
         "and blue'); use one when an element of the series contains a conjunction or when the "
@@ -136,7 +137,9 @@ def series_items(text: str, guide: StyleGuide, next_id: int = 1) -> tuple[list[I
     items, edits = [], {}
     for sr in find_series(text, guide):
         built = candidate(f"{guide.title}.SerialComma", sr.text, guide)
-        rule = built[1] if built else ""
+        if built is None:                 # the guide settles it mechanically; nothing to ask
+            continue
+        rule = built[1]
         line, col = _line_col(text, sr.start)
         items.append(Item(next_id, sr.text, (sr.candidate, "KEEP"), rule,
                           sentence_context(text, sr.start, sr.end), line, col,

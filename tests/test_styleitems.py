@@ -76,3 +76,10 @@ def test_guardian_oxford_comma_follows_the_guide():
     assert candidate("Guardian.SerialComma", "cereal, kippers, bacon, eggs, toast and marmalade, and tea", g) is None
     rep, _ = candidate("Guardian.SerialComma", "ham, eggs, and chips", g)
     assert rep == "ham, eggs and chips"
+
+
+def test_series_items_skip_mechanically_settled_cases():
+    from stylefix.styleitems import series_items
+    text = "He ate cereal, kippers, toast and marmalade, and tea. Then ham, eggs, and chips.\n"
+    items, edits = series_items(text, get("guardian"))
+    assert [i.word for i in items] == ["Then ham, eggs, and chips"]
