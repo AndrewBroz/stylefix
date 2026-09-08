@@ -1,9 +1,19 @@
-"""Style-guide alerts that become adjudication items: one concrete edit
-versus KEEP, decided from the sentence."""
+"""Style-guide questions that become adjudication items: one concrete edit
+versus KEEP, decided from the sentence.
+
+Serial commas are detected here, in Python over the raw prose, rather
+than by a Vale rule: Vale strips inline markup from its match text and
+misses a series that runs into bold or contains an HTML entity. Each
+decision is applied as a one-character edit at the comma's raw position,
+so markup inside the series is never touched."""
 
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
+
+from adjudicate import Edit, Item, protected_spans, sentence_context
+from adjudicate.context import _HTML_ENTITY
 
 from .styleguides import StyleGuide
 
@@ -28,6 +38,87 @@ def number_words(n: int) -> str:
 _SERIAL_MISSING = re.compile(r"^(.*[^,\s])( (?:and|or) [^,]+)$", re.S)
 _SERIAL_PRESENT = re.compile(r"^(.*[^\s]),( (?:and|or) [^,]+)$", re.S)
 _NUMBER = re.compile(r"^(\s)(\d{1,3})(\s)$")
+
+# A series item: up to eight words, where a word may carry markup or an
+# HTML entity, but never sentence punctuation or a comma.
+_W = r"(?:&#?\w+;|[^\s,.;:!?])+"
+_ITEM = rf"{_W}(?:[ \t]+{_W}){{0,7}}"
+SERIES_MISSING = re.compile(rf"{_ITEM}, {_ITEM} (?:and|or) {_ITEM}")
+SERIES_PRESENT = re.compile(rf"{_ITEM}, {_ITEM}, (?:and|or) {_ITEM}")
+_LAST_CONJ_NO_COMMA = re.compile(r"([^,\s])(\s+(?:and|or)\s)(?!.*\s(?:and|or)\s)", re.S)
+_LAST_CONJ_COMMA = re.compile(r",(\s+(?:and|or)\s)(?!.*,\s+(?:and|or)\s)", re.S)
+
+
+@dataclass
+class Series:
+    start: int          # absolute offsets of the matched series
+    end: int
+    text: str
+    edit: Edit          # the one-character change that would apply the guide
+    candidate: str      # the series as it would read after the change
+
+
+def _line_col(text: str, pos: int) -> tuple[int, int]:
+    return text.count("\n", 0, pos) + 1, pos - (text.rfind("\n", 0, pos) + 1) + 1
+
+
+def _regions(text: str) -> list[tuple[int, int]]:
+    """Prose regions for series detection: code, links, URLs, HTML tags and
+    front matter are skipped, but an HTML entity is text (a series can
+    contain one)."""
+    spans = [(s, e) for s, e in protected_spans(text) if not _HTML_ENTITY.fullmatch(text[s:e])]
+    regions, cursor = [], 0
+    for s, e in spans:
+        if s > cursor:
+            regions.append((cursor, s))
+        cursor = max(cursor, e)
+    if cursor < len(text):
+        regions.append((cursor, len(text)))
+    return regions
+
+
+def find_series(text: str, guide: StyleGuide) -> list[Series]:
+    """Every series the guide has an opinion about, with its minimal edit."""
+    if guide.serial_comma not in ("require", "omit"):
+        return []
+    rx = SERIES_MISSING if guide.serial_comma == "require" else SERIES_PRESENT
+    out: list[Series] = []
+    for rs, re_ in _regions(text):
+        for m in rx.finditer(text, rs, re_):
+            raw = m.group(0)
+            if guide.serial_comma == "require":
+                c = list(_LAST_CONJ_NO_COMMA.finditer(raw))
+                if not c:
+                    continue
+                pos = m.start() + c[-1].end(1)
+                line, col = _line_col(text, pos)
+                edit = Edit(line, col, col - 1, "", ",", "style")          # insertion
+                cand = raw[:c[-1].end(1)] + "," + raw[c[-1].end(1):]
+            else:
+                c = list(_LAST_CONJ_COMMA.finditer(raw))
+                if not c:
+                    continue
+                pos = m.start() + c[-1].start()
+                line, col = _line_col(text, pos)
+                edit = Edit(line, col, col, ",", "", "style")                # deletion
+                cand = raw[:c[-1].start()] + raw[c[-1].start() + 1:]
+            out.append(Series(m.start(), m.end(), raw, edit, cand))
+    return out
+
+
+def series_items(text: str, guide: StyleGuide, next_id: int = 1) -> tuple[list[Item], dict[int, Edit]]:
+    """Adjudication items for every series, and the edit each decision applies."""
+    items, edits = [], {}
+    for sr in find_series(text, guide):
+        built = candidate(f"{guide.title}.SerialComma", sr.text, guide)
+        rule = built[1] if built else ""
+        line, col = _line_col(text, sr.start)
+        items.append(Item(next_id, sr.text, (sr.candidate, "KEEP"), rule,
+                          sentence_context(text, sr.start, sr.end), line, col,
+                          col + (sr.end - sr.start) - 1, source="style"))
+        edits[next_id] = sr.edit
+        next_id += 1
+    return items, edits
 
 
 def candidate(check: str, match: str, guide: StyleGuide) -> tuple[str, str] | None:

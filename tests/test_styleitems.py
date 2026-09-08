@@ -28,3 +28,27 @@ def test_number_candidates():
     assert rep == " ten " and "percentages" in rule
     assert candidate("GPO.Numbers", " 10 ", get("gpo")) is None      # numerals from 10
     assert candidate("GPO.Numbers", " 4 ", get("gpo"))[0] == " four "
+
+
+def test_find_series_handles_markup_entities_numbers():
+    from adjudicate import apply_edits
+    from stylefix.styleitems import find_series
+    text = ("Labs must monitor, detect, and correct&#32;**unsanctioned AI actions**. "
+            "Undermined by **inadequate 1) cybersecurity, 2) model containment, or 3) monitoring** of harm. "
+            "Defences, more trustworthy and reliable products, financial stability, and more predictable deployments. "
+            "Reviewed the budget, and the timeline.\n")
+    found = find_series(text, get("guardian"))
+    cands = [f.candidate for f in found]
+    assert any("monitor, detect and correct&#32;**unsanctioned" in c for c in cands)
+    assert any("2) model containment or 3) monitoring" in c for c in cands)
+    assert any("financial stability and more predictable" in c for c in cands)
+    new, skipped = apply_edits(text, [f.edit for f in found])
+    assert not skipped
+    assert "monitor, detect and correct&#32;**unsanctioned AI actions**." in new
+    assert "**inadequate 1) cybersecurity, 2) model containment or 3) monitoring**" in new
+    assert "Reviewed the budget, and the timeline" in new          # two items: not a series
+    # the reverse direction
+    found = find_series(new, get("chicago"))
+    new2, skipped = apply_edits(new, [f.edit for f in found])
+    assert not skipped and "monitor, detect, and correct&#32;**unsanctioned" in new2
+    assert "2) model containment, or 3) monitoring**" in new2

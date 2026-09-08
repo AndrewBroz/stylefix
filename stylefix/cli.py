@@ -212,7 +212,7 @@ def partition(text: str, alerts: list[Alert], target: str, guide: str,
                 next_id += 1
             else:
                 edits.append(Edit(a.line, a.start, a.end, a.match, a.replacement, a.check))
-        elif adjudicate_style and a.check.rsplit(".", 1)[-1] in ("SerialComma", "Numbers"):
+        elif adjudicate_style and a.check.rsplit(".", 1)[-1] == "Numbers":
             built = styleitems.candidate(a.check, a.match, style)
             if built is None:
                 review.append(a)
@@ -293,6 +293,14 @@ def main(argv: list[str] | None = None) -> int:
                           timeout=args.timeout)
     edits, items, review = partition(text, alerts, args.target, guide, args.oxford_ize,
                                      adjudicate_style=ep is not None)
+    series, series_edits = styleitems.series_items(text, styleguides.get(guide), next_id=len(items) + 1)
+    if ep is not None:
+        items += series
+    else:
+        for it in series:
+            review.append(Alert(it.line, it.start, it.end, f"{styleguides.get(guide).title}.SerialComma",
+                                it.word, f"{styleguides.get(guide).title}: check the comma before "
+                                f"'and'/'or' in '{it.word[:60]}'.", "suggestion", "", []))
     ab_edits, ab_items, ab_warnings = abbreviations.plan(text, guide, args.abbreviation_nouns,
                                                          next_id=len(items) + 1)
     edits += ab_edits
@@ -323,7 +331,10 @@ def main(argv: list[str] | None = None) -> int:
         if d.choice is None and ep is None and d.item.source == "capitalized":
             d.choice, d.reason = d.item.options[0], "applied without adjudication"
         rep = d.replacement
-        if rep:
+        if rep and d.item.id in series_edits:
+            e = series_edits[d.item.id]
+            edits.append(Edit(e.line, e.start, e.end, e.original, e.replacement, "adjudicated"))
+        elif rep:
             edits.append(Edit(d.item.line, d.item.start, d.item.end, d.item.word, rep, "adjudicated"))
 
     new_text, skipped = apply_edits(text, edits)
