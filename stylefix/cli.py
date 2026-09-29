@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import difflib
+import math
 import os
 import re
 import sys
@@ -31,7 +32,7 @@ organise/organize, centre/center ...) and style-guide preferences
 (towards/toward) are replaced outright, with case preserved. Words whose
 correct form depends on meaning (licence/license, programme/program,
 cheque/check, storey/story ...), and any replacement that sits inside a
-quotation or looks like a proper name, are put to a local language model as a
+quotation or looks like a proper name, are put to a language model as a
 multiple-choice question with the surrounding sentence; it picks one of the
 supplied options or KEEP, and never rewrites prose. Everything the tool will
 not decide is listed in a report written next to the output.
@@ -87,8 +88,19 @@ files:
                           entry to override it on the next run
 
 Requires the vale binary on PATH (brew install vale). Full documentation:
-man stylefix, or README.md in the source tree.
+https://github.com/AndrewBroz/stylefix (man page: man/stylefix.1 in the source)
 """
+
+
+def positive_seconds(text: str) -> float:
+    """argparse type for --timeout: a positive, finite number of seconds."""
+    try:
+        value = float(text)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"not a number: {text!r}") from None
+    if not (math.isfinite(value) and value > 0):
+        raise argparse.ArgumentTypeError(f"must be a positive number of seconds, not {text}")
+    return value
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -143,7 +155,9 @@ def build_parser() -> argparse.ArgumentParser:
                         "ollama: local Ollama only; none: skip the model, ambiguous "
                         "words go to the report (default: %(default)s)")
     m.add_argument("--url", metavar="URL",
-                   help="OpenAI-compatible base URL ending in /v1; overrides --llm")
+                   help="OpenAI-compatible base URL ending in /v1; overrides every configured "
+                        "url. A --url or STYLEFIX_LLM_URL drops keys set in lower layers; set "
+                        "STYLEFIX_LLM_KEY (or api_key_env in the same config file) alongside it")
     m.add_argument("--model", metavar="NAME", help="model name at the endpoint")
     m.add_argument("--think", action="store_true",
                    help="let a reasoning model think before answering: slower, slightly "
@@ -155,7 +169,7 @@ def build_parser() -> argparse.ArgumentParser:
                    help="items per model request (default: %(default)s)")
     m.add_argument("--parallel", type=int, default=4, metavar="N",
                    help="concurrent model requests (default: %(default)s)")
-    m.add_argument("--timeout", type=float, default=None, metavar="SEC",
+    m.add_argument("--timeout", type=positive_seconds, default=None, metavar="SEC",
                    help="seconds to wait for one model request (default: 120, or timeout in config.toml)")
     m.add_argument("--cache", type=Path, default=Path(".stylefix/cache.json"), metavar="FILE",
                    help="where model decisions are cached (default: %(default)s)")

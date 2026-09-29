@@ -145,7 +145,9 @@ LiteLLM, llama.cpp's server, or a hosted API. stylefix takes its settings
 from, highest first: `--url`/`--model`/`--timeout`; `STYLEFIX_LLM_URL`,
 `STYLEFIX_LLM_MODEL`, `STYLEFIX_LLM_KEY`; `~/.config/stylefix/config.toml`;
 `ADJUDICATE_LLM_*`; and `~/.config/adjudicate/config.toml`, which proofix
-reads too. With nothing configured, `--llm auto` (the default) uses a local
+reads too. A `--url` or `STYLEFIX_LLM_URL` drops keys set in lower layers;
+set `STYLEFIX_LLM_KEY` (or `api_key_env` in the same config file) alongside
+it. With nothing configured, `--llm auto` (the default) uses a local
 Ollama if one is running with a model pulled, and otherwise runs as
 `--llm none`: ambiguous words are left alone and listed in the report,
 while capitalised deterministic swaps are applied anyway.

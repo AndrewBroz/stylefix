@@ -76,7 +76,8 @@ def test_check_endpoint_needs_no_input_file(capsys):
 def test_setup_needs_a_terminal(monkeypatch, capsys):
     monkeypatch.setattr("sys.stdin", io.StringIO(""))
     assert main(["--setup"]) == 2
-    assert "terminal" in capsys.readouterr().out
+    captured = capsys.readouterr()
+    assert "terminal" in captured.err and "terminal" not in captured.out
 
 
 def test_config_url_reaches_the_server(isolated_llm_config, tmp_path, chat_server):

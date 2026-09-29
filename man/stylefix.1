@@ -189,7 +189,9 @@ skips the model: ambiguous words are left as they are and listed in the
 report, while capitalised deterministic replacements are applied anyway.
 .TP
 .BI \-\-url " URL"
-Any OpenAI-compatible base URL ending in /v1. Overrides every configured endpoint.
+Any OpenAI-compatible base URL ending in /v1. Overrides every configured url.
+A \-\-url or STYLEFIX_LLM_URL drops keys set in lower layers; set
+STYLEFIX_LLM_KEY (or \fBapi_key_env\fR in the same config file) alongside it.
 .TP
 .BI \-\-model " NAME"
 Model name at the endpoint. If no layer sets one, the server's first listed model.
@@ -212,7 +214,8 @@ Concurrent model requests. Default 4. A serving stack with continuous
 batching (vLLM) scales almost linearly with this.
 .TP
 .BI \-\-timeout " SEC"
-Seconds to wait for one model request. Default 120, or \fBtimeout\fR in config.toml.
+Seconds to wait for one model request, a positive number. Default 120, or
+\fBtimeout\fR in config.toml.
 .TP
 .BI \-\-cache " FILE"
 Where model decisions are cached, keyed on target, word and sentence.

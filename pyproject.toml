@@ -28,6 +28,13 @@ stylefix = "stylefix.cli:main"
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+# Only what an sdist needs, so nothing ignored elsewhere (.superpowers/ via a
+# global gitignore, docs/superpowers/) can leak in.
+[tool.hatch.build.targets.sdist]
+only-include = ["stylefix", "tests", "man", "examples", "scripts", "LICENSE", "README.md",
+                "pyproject.toml"]
+exclude = ["__pycache__", "*.pyc"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["stylefix"]
 include = ["stylefix/**/*.txt", "stylefix/**/*.yml", "stylefix/dict/*"]
