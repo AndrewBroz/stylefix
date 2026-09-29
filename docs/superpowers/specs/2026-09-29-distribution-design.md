@@ -63,8 +63,9 @@ Settings come from these layers, highest first:
 5. `$XDG_CONFIG_HOME/adjudicate/config.toml`, table `[llm]`
 
 `$XDG_CONFIG_HOME` defaults to `~/.config`. Layers merge field by field,
-with one rule: a layer that sets `url` discards `model` and the key from
-every layer below it, since those belonged to a different server. So an
+with one rule: a layer that sets `url` discards `model`, the key and
+`thinking_switch` from every layer below it, since those belonged to a
+different server. So an
 app config that sets only `model` refines the shared endpoint, while
 `--url` on the command line never inherits a model name meant for
 another host.
@@ -94,10 +95,14 @@ Outcome:
   is unreachable, the first request fails with the existing
   `LLMError` ("cannot reach … at …"), and the items fall through to the
   report as transport errors do today. It never falls back to Ollama.
-- No `url`, `preset` `auto` or `ollama`: try local Ollama as today
-  (`OLLAMA_HOST`, default `http://localhost:11434`), applying any
-  `model`, key, `timeout` from the layers. `auto` returns `None` if
-  Ollama is not there.
+- No `url`, `preset` `auto`: try local Ollama as today (`OLLAMA_HOST`,
+  default `http://localhost:11434`), applying any `model`, key and
+  `timeout` from the layers. Return `None` if Ollama is not there, or is
+  running with no model pulled; the run then proceeds as `--llm none`.
+- `preset` `ollama`: an explicit choice of local Ollama. Only the
+  arguments apply (so `--model` and `--timeout` work, and a configured
+  remote `url` does not take over). Return `None` if Ollama is not there;
+  raise `ConfigError` if it has no model.
 
 ### Model discovery
 
