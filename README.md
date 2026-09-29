@@ -202,15 +202,17 @@ only the `--accept` file.
   VarCon and that the old hand tables are still fully covered.
 - **Ambiguous words** live in `stylefix/candidates.py` and the matching
   `Ambiguous.yml` token regex.
-- **Style rules** are plain Vale YAML under `stylefix/styles/Chicago` and
-  `stylefix/styles/Oxford`; any substitution rule with `action: replace` is
+- **Style rules** are plain Vale YAML under `stylefix/styles/<Guide>`, generated
+  from `stylefix/styleguides.py`; any substitution rule with `action: replace` is
   applied automatically, anything else goes to the report.
 
 ## Limitations
 
 - The UK direction does not move punctuation outside quotation marks: whether
   a comma belongs to the quote is not knowable mechanically.
-- `Numbers` and `SerialComma` are heuristics and only ever flag.
+- Numeral and serial-comma detection is heuristic, so no hit is applied
+  mechanically: each goes to the model, which chooses the edit or KEEP, or to
+  the report when no model is available (`--llm none`, or no endpoint reachable).
 - `.docx` files: convert with pandoc first
   (`pandoc in.docx -t gfm -o in.md`), fix, convert back.
 
