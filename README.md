@@ -39,8 +39,8 @@ Every candidate word lands in one of three tiers:
 | adjudicated | words with a sense split (licence/license, programme/program), pattern hits whose rewrite is in no dictionary (coinages, names), any hit that is capitalised mid-sentence or inside a quotation, and the style guide's serial-comma and numeral rules | a language model chooses between the candidates and KEEP |
 | review | spellings that look like the other variety but could not be converted; serial-comma and numeral hits when no model is configured | listed in the report and the `--changes` log |
 
-**Two data sources, both from the SCOWL project and shipped in
-`stylefix/dict/`.**
+**Two data sources, both from the SCOWL project: VarCon, shipped in
+`stylefix/dict/`, and the Hunspell dictionaries that come with adjudicate.**
 
 - **VarCon** (Variant Conversion Info) is the curated table: about 15,000
   spellings mapped to their preferred American, British and Oxford forms,
