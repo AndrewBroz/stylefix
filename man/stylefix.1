@@ -1,4 +1,4 @@
-.TH STYLEFIX 1 "September 2026" "stylefix 0.6.0" "User Commands"
+.TH STYLEFIX 1 "September 2026" "stylefix 0.7.0" "User Commands"
 .SH NAME
 stylefix \- regularize a Markdown file to US or UK English and a style guide
 .SH SYNOPSIS
@@ -12,9 +12,9 @@ stylefix \- regularize a Markdown file to US or UK English and a style guide
 takes a Markdown file and writes a copy whose spelling, punctuation and
 dates follow one English variety (US or UK) and one style guide (Chicago
 Manual of Style or Oxford / New Hart's Rules). It is fully automatic and
-runs locally: Vale decides what to change, a small wrapper applies the
-changes, and a local language model settles the few words that depend on
-meaning. Fenced code, inline code, link targets, URLs and YAML front matter
+runs locally unless pointed at a hosted model: Vale decides what to change,
+a small wrapper applies the changes, and a language model settles the few
+words that depend on meaning. Fenced code, inline code, link targets, URLs and YAML front matter
 are never modified.
 .PP
 Every Vale alert lands in one of three tiers:
@@ -174,24 +174,25 @@ left for human review, grouped by check.
 implies this.
 .SS Model
 .TP
-.BR \-\-llm " {auto|dgx|ollama|none}"
-Endpoint preset.
-.B dgx
-reads the dgx-llm gateway address, key and primary model from
-.IR $DGX_LLM_DIR/.env .
+.BR \-\-llm " {auto|ollama|none}"
+Endpoint choice.
+.B auto
+(the default) uses the endpoint configured by flags, environment or
+config file (see
+.BR ENVIRONMENT " and " FILES ),
+or else a local Ollama with a model pulled, or else no model.
 .B ollama
-uses the local Ollama server and its first installed model.
+uses the local Ollama server and its first installed model, ignoring
+configured endpoints.
 .B none
 skips the model: ambiguous words are left as they are and listed in the
 report, while capitalised deterministic replacements are applied anyway.
-.B auto
-(the default) uses the first of dgx, ollama that answers.
 .TP
 .BI \-\-url " URL"
-Any OpenAI-compatible base URL ending in /v1. Overrides the preset.
+Any OpenAI-compatible base URL ending in /v1. Overrides every configured endpoint.
 .TP
 .BI \-\-model " NAME"
-Model name at the endpoint.
+Model name at the endpoint. If no layer sets one, the server's first listed model.
 .TP
 .B \-\-think
 Let a reasoning model think before answering. Slower by a factor of four to
@@ -211,7 +212,7 @@ Concurrent model requests. Default 4. A serving stack with continuous
 batching (vLLM) scales almost linearly with this.
 .TP
 .BI \-\-timeout " SEC"
-Seconds to wait for one model request. Default 120.
+Seconds to wait for one model request. Default 120, or \fBtimeout\fR in config.toml.
 .TP
 .BI \-\-cache " FILE"
 Where model decisions are cached, keyed on target, word and sentence.
@@ -222,6 +223,28 @@ run.
 .TP
 .B \-\-no\-cache
 Neither read nor write the cache.
+.SS Configuration
+.TP
+.B \-\-setup
+Ask where the model is (local Ollama, a hosted OpenAI-compatible API, or a
+self-hosted server), test it, and save the answer as the
+.B [llm]
+table of
+.I ~/.config/adjudicate/config.toml
+(shared with proofix) or
+.IR ~/.config/stylefix/config.toml .
+An existing table is shown and replaced only on confirmation, after a
+backup to
+.IR config.toml.bak ;
+other tables are kept. For a self-hosted server it detects whether to set
+.BR thinking_switch .
+Needs a terminal. Ends by running the check below.
+.TP
+.B \-\-check\-endpoint
+Print the endpoint stylefix would use, one line per setting with the
+layer it came from (a key is never shown), then list the server's models
+and send one small request. Honours
+.BR \-\-llm ", " \-\-url ", " \-\-model " and " \-\-timeout .
 .SS General
 .TP
 .BR \-v ", " \-\-verbose
@@ -235,19 +258,30 @@ Print the usage summary and exit.
 .SH ENVIRONMENT
 .TP
 .BR STYLEFIX_LLM_URL ", " STYLEFIX_LLM_MODEL ", " STYLEFIX_LLM_KEY
-Override the endpoint, model and API key; equivalent to
-.BR \-\-url ", " \-\-model
-and the key that the presets would read.
+Endpoint, model and API key for stylefix; below the flags, above the
+config files.
 .TP
-.B DGX_LLM_DIR
-Directory holding the dgx-llm
-.I .env
-file. Default
-.IR ~/Code/dgx-llm .
+.BR ADJUDICATE_LLM_URL ", " ADJUDICATE_LLM_MODEL ", " ADJUDICATE_LLM_KEY
+The same, shared with proofix; below
+.I ~/.config/stylefix/config.toml
+and above
+.IR ~/.config/adjudicate/config.toml .
 .TP
 .B OLLAMA_HOST
 Ollama base URL. Default http://localhost:11434.
 .SH FILES
+.TP
+.I ~/.config/stylefix/config.toml
+.TQ
+.I ~/.config/adjudicate/config.toml
+Table
+.B [llm]
+with keys
+.BR url ", " model ", " api_key " or " api_key_env ", " timeout ", " thinking_switch .
+The first applies to stylefix only; the second is shared with proofix. A
+file that sets
+.B url
+discards the model, key and thinking_switch of the layers below it.
 .TP
 .I ~/.config/stylefix/accept.txt
 Personal accept list, one term per line. Honours XDG_CONFIG_HOME.
@@ -266,10 +300,19 @@ reproducible runs.
 .SH EXIT STATUS
 .TP
 .B 0
-Finished. Undecided words and review items are reported, not fatal.
+Finished. Undecided words and review items are reported, not fatal. For
+.BR \-\-check\-endpoint " and " \-\-setup :
+the endpoint answers.
+.TP
+.B 1
+.BR \-\-check\-endpoint " or " \-\-setup :
+no endpoint, or it does not answer; or setup was cancelled or declined.
 .TP
 .B 2
-Input file missing, or Vale not found or failed.
+Input file missing, Vale not found or failed, or an invalid endpoint
+configuration (the message names the file and key). For
+.BR \-\-setup :
+standard input is not a terminal.
 .SH EXAMPLES
 Write draft.us.md and draft.us.md.report.md using Chicago conventions:
 .PP
@@ -305,10 +348,9 @@ A Word document, via pandoc:
 .fi
 .SH SEE ALSO
 .BR vale (1),
-.BR pandoc (1),
-.BR dgx (1).
+.BR pandoc (1).
 .PP
-Source and README: ~/Code/stylefix. Word pairs live in
+Source and README: https://github.com/AndrewBroz/stylefix. Word pairs live in
 .IR stylefix/wordlist.py ,
 ambiguous-word rules in
 .IR stylefix/candidates.py ,

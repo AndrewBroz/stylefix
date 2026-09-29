@@ -1,7 +1,7 @@
 # stylefix
 
 Regularize a Markdown file to **US or UK English** and a **style guide**
-(Chicago or Oxford), fully automatically and fully locally.
+(Chicago, Oxford, AP, GPO, APA or Guardian), fully automatically, and locally unless you point it at a hosted model.
 
 ```
 stylefix draft.md --target us              # -> draft.us.md + draft.us.md.report.md
@@ -12,20 +12,22 @@ stylefix draft.md --target us --changes    # list every change as it is made
 
 [Vale](https://vale.sh) decides what to change; a small Python wrapper applies
 the changes. The few words that need judgement (UK *licence*/*license*,
-*programme*/*program*, *cheque*/*check*, ...) are put to a local model as a
+*programme*/*program*, *cheque*/*check*, ...) are put to a language model as a
 multiple-choice question with the surrounding sentence. The model never
 rewrites prose: it picks one of the options you supply, or KEEP.
 
 ## Install
 
 ```
-brew install vale            # or see https://vale.sh/docs/install
-uv tool install .            # or: pip install .
-ln -s "$PWD/man/stylefix.1" /opt/homebrew/share/man/man1/   # optional: man stylefix
+uv tool install stylefix      # or: pipx install stylefix
 ```
 
-Python 3.11+. One dependency, `spylls`, a pure-Python Hunspell. `stylefix --help` gives the full
-option reference with examples; `man stylefix` the long form.
+stylefix also needs [Vale](https://vale.sh/docs/install) on your PATH:
+`brew install vale` on macOS, `choco install vale` on Windows, or a release
+binary from GitHub on Linux. Python 3.11+.
+
+`stylefix --help` gives the full option reference with examples. The man
+page is in the repository at `man/stylefix.1` (`man ./man/stylefix.1`).
 
 ## How it works
 
@@ -34,7 +36,7 @@ Every candidate word lands in one of three tiers:
 | tier | mechanism | what happens |
 |---|---|---|
 | deterministic | **suffix patterns** confirmed against dictionaries, plus a curated table for the irregular families | applied, case preserved |
-| adjudicated | words with a sense split (licence/license, programme/program), pattern hits whose rewrite is in no dictionary (coinages, names), any hit that is capitalised mid-sentence or inside a quotation, and the style guide's serial-comma and numeral rules | a local model chooses between the candidates and KEEP |
+| adjudicated | words with a sense split (licence/license, programme/program), pattern hits whose rewrite is in no dictionary (coinages, names), any hit that is capitalised mid-sentence or inside a quotation, and the style guide's serial-comma and numeral rules | a language model chooses between the candidates and KEEP |
 | review | spellings that look like the other variety but could not be converted; serial-comma and numeral hits when no model is configured | listed in the report and the `--changes` log |
 
 **Two data sources, both from the SCOWL project and shipped in
@@ -127,18 +129,53 @@ decision with its confidence and reason, and every alert left for a human.
 
 ## The model
 
-Any OpenAI-compatible `/v1/chat/completions` endpoint works. `--llm auto`
-(the default) tries, in order:
+The quickest way to set one up is
 
-1. `dgx` — the LiteLLM gateway of the [dgx-llm](../dgx-llm) stack, configured
-   from `$DGX_LLM_DIR/.env` (default `~/Code/dgx-llm/.env`).
-2. `ollama` — `http://localhost:11434`, first installed model.
+```
+stylefix --setup
+```
 
-`--llm none` skips the model: ambiguous words are left alone and listed in the
-report; capitalised deterministic swaps are applied anyway.
+which asks where your model is (local Ollama, a hosted API, or your own
+server), tests it, and saves the answer where both stylefix and proofix
+find it. `stylefix --check-endpoint` shows what stylefix will use, where
+each setting came from, and whether the endpoint answers.
 
-Override anything with `--url`, `--model`, or the environment variables
-`STYLEFIX_LLM_URL`, `STYLEFIX_LLM_MODEL`, `STYLEFIX_LLM_KEY`.
+Any OpenAI-compatible `/v1/chat/completions` endpoint works: Ollama, vLLM,
+LiteLLM, llama.cpp's server, or a hosted API. stylefix takes its settings
+from, highest first: `--url`/`--model`/`--timeout`; `STYLEFIX_LLM_URL`,
+`STYLEFIX_LLM_MODEL`, `STYLEFIX_LLM_KEY`; `~/.config/stylefix/config.toml`;
+`ADJUDICATE_LLM_*`; and `~/.config/adjudicate/config.toml`, which proofix
+reads too. With nothing configured, `--llm auto` (the default) uses a local
+Ollama if one is running with a model pulled, and otherwise runs as
+`--llm none`: ambiguous words are left alone and listed in the report,
+while capitalised deterministic swaps are applied anyway.
+
+**Ollama**: nothing to configure; the first installed model is used.
+`--model` picks another.
+
+**A hosted API**:
+
+```toml
+# ~/.config/adjudicate/config.toml
+[llm]
+url = "https://api.openai.com/v1"
+model = "gpt-4.1-mini"
+api_key_env = "OPENAI_API_KEY"   # the key stays in your environment
+```
+
+**Self-hosted vLLM or LiteLLM with a reasoning model**:
+
+```toml
+[llm]
+url = "http://gpu-box:8000/v1"
+model = "qwen3"
+thinking_switch = true   # send enable_thinking: false, which vLLM honours
+```
+
+Leave `model` out and the server's first listed model is used. A key the
+file or environment names but that is unset, an unknown key, or a wrong
+type stops the run with the file and key named. The full table is
+documented in [adjudicate](https://github.com/AndrewBroz/adjudicate#choosing-the-model-endpoint).
 
 Requests go out in batches of `--batch-size` items (20), `--parallel` (4) at a
 time, so a serving stack with continuous batching (vLLM) answers a document's
@@ -156,10 +193,10 @@ speed. `scripts/eval_adjudicator.py` scores an endpoint on 48 gold cases
 (noun/verb splits, sense splits, proper nouns, quotations) and reports latency:
 
 ```
-uv run python scripts/eval_adjudicator.py --llm dgx [--think] [--parallel 8] [--repeat 4]
+uv run python scripts/eval_adjudicator.py [--url URL --model NAME] [--think] [--parallel 8] [--repeat 4]
 ```
 
-Measured on a DGX Spark serving Qwen3.8-27B (NVFP4) through vLLM:
+One measurement, on a DGX Spark serving Qwen3.8-27B (NVFP4) through vLLM:
 
 | mode | accuracy | per item |
 |---|---|---|
@@ -215,6 +252,12 @@ only the `--accept` file.
   the report when no model is available (`--llm none`, or no endpoint reachable).
 - `.docx` files: convert with pandoc first
   (`pandoc in.docx -t gfm -o in.md`), fix, convert back.
+
+## License
+
+MIT (see `LICENSE`). `stylefix/dict/varcon.txt.gz` is VarCon, under the
+notice in `stylefix/dict/README-varcon.txt`. The spelling dictionaries come
+with [adjudicate](https://github.com/AndrewBroz/adjudicate).
 
 ## Development
 
