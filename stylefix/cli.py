@@ -9,12 +9,14 @@ import re
 import sys
 from pathlib import Path
 
+from adjudicate import check_endpoint, run_setup
+
 from . import __version__, abbreviations, candidates, changelog, patterns, report, spellcheck, styleguides, styleitems
 from .adjudicate import Cache, Item, adjudicate
 from .apply import Edit, apply_edits, match_case, to_offsets
 from .context import at_sentence_start, inside_quotes, sentence_context
 from .conventions import normalize
-from .llm import resolve_endpoint
+from .llm import ConfigError, resolve_endpoint
 from .vale_runner import Alert, ValeError, run_vale
 
 FRONT_MATTER = re.compile(r"\A---\n.*?\n---\n", re.S)
@@ -41,9 +43,12 @@ in number ranges, and date order (September 4, 2026 / 4 September 2026).
 
 EPILOG = """\
 examples:
+  stylefix --setup
+      choose and test a model endpoint, and save it for stylefix and proofix
+
   stylefix draft.md --target us
       write draft.us.md and draft.us.md.report.md, Chicago conventions,
-      ambiguous words decided by the first reachable model (DGX, then Ollama)
+      ambiguous words decided by the configured model, or local Ollama
 
   stylefix draft.md --target uk --oxford-ize -o final.md
       British spelling with Oxford -ize, Oxford dash and quote style
@@ -67,11 +72,15 @@ examples:
 
 environment:
   STYLEFIX_LLM_URL, STYLEFIX_LLM_MODEL, STYLEFIX_LLM_KEY
-      override the model endpoint (same as --url, --model, and the API key)
-  DGX_LLM_DIR   directory holding the dgx-llm .env (default ~/Code/dgx-llm)
+      the model endpoint for stylefix (same as --url, --model, and the API key)
+  ADJUDICATE_LLM_URL, ADJUDICATE_LLM_MODEL, ADJUDICATE_LLM_KEY
+      the same, shared with proofix; below the stylefix variables and config
   OLLAMA_HOST   Ollama base URL (default http://localhost:11434)
 
 files:
+  ~/.config/stylefix/config.toml     [llm] url, model, api_key or api_key_env,
+                                     timeout, thinking_switch (stylefix only)
+  ~/.config/adjudicate/config.toml   the same table, shared with proofix
   <output>.report.md      every replacement, every model decision with its
                           reason and confidence, and alerts left for review
   .stylefix/cache.json    model decisions keyed on word and sentence; edit an
@@ -127,10 +136,12 @@ def build_parser() -> argparse.ArgumentParser:
                         "how it was decided (-v implies this)")
 
     m = p.add_argument_group("model", "how ambiguous words are adjudicated")
-    m.add_argument("--llm", choices=["auto", "dgx", "ollama", "none"], default="auto",
-                   help="endpoint preset: dgx (dgx-llm gateway), ollama (local), none (skip the "
-                        "model; ambiguous words go to the report), auto (first reachable of "
-                        "dgx, ollama) (default: %(default)s)")
+    m.add_argument("--llm", choices=["auto", "ollama", "none"], default="auto",
+                   help="auto: the endpoint from --url, STYLEFIX_LLM_*, "
+                        "~/.config/stylefix/config.toml, ADJUDICATE_LLM_* or "
+                        "~/.config/adjudicate/config.toml, else local Ollama; "
+                        "ollama: local Ollama only; none: skip the model, ambiguous "
+                        "words go to the report (default: %(default)s)")
     m.add_argument("--url", metavar="URL",
                    help="OpenAI-compatible base URL ending in /v1; overrides --llm")
     m.add_argument("--model", metavar="NAME", help="model name at the endpoint")
@@ -144,12 +155,20 @@ def build_parser() -> argparse.ArgumentParser:
                    help="items per model request (default: %(default)s)")
     m.add_argument("--parallel", type=int, default=4, metavar="N",
                    help="concurrent model requests (default: %(default)s)")
-    m.add_argument("--timeout", type=float, default=120.0, metavar="SEC",
-                   help="seconds to wait for one model request (default: %(default)s)")
+    m.add_argument("--timeout", type=float, default=None, metavar="SEC",
+                   help="seconds to wait for one model request (default: 120, or timeout in config.toml)")
     m.add_argument("--cache", type=Path, default=Path(".stylefix/cache.json"), metavar="FILE",
                    help="where model decisions are cached (default: %(default)s)")
     m.add_argument("--no-cache", action="store_true",
                    help="neither read nor write the decision cache")
+
+    c = p.add_argument_group("configuration", "set up or check the model endpoint, then exit")
+    c.add_argument("--setup", action="store_true",
+                   help="choose a model endpoint interactively, test it, and save it to "
+                        "~/.config/adjudicate/config.toml or ~/.config/stylefix/config.toml")
+    c.add_argument("--check-endpoint", action="store_true",
+                   help="show the endpoint stylefix would use and where each setting comes "
+                        "from, then test it; exit 0 if it answers, 1 if not, 2 on a config error")
     return p
 
 
@@ -264,6 +283,11 @@ def load_accept_lists(explicit: Path | None, no_default: bool) -> list[str] | No
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.setup:
+        return run_setup("stylefix")
+    if args.check_endpoint:
+        return check_endpoint("stylefix", preset=args.llm, url=args.url, model=args.model,
+                              timeout=args.timeout)
     if args.list_styles:
         sys.stdout.write(styleguides.describe())
         return 0
@@ -289,8 +313,12 @@ def main(argv: list[str] | None = None) -> int:
     except ValeError as e:
         print(f"stylefix: {e}", file=sys.stderr)
         return 2
-    ep = resolve_endpoint(args.llm, args.model, args.url, think=args.think,
-                          timeout=args.timeout)
+    try:
+        ep = resolve_endpoint("stylefix", args.llm, url=args.url, model=args.model,
+                              think=args.think, timeout=args.timeout)
+    except ConfigError as e:
+        print(f"stylefix: {e}", file=sys.stderr)
+        return 2
     edits, items, review = partition(text, alerts, args.target, guide, args.oxford_ize,
                                      adjudicate_style=ep is not None)
     series, series_edits = styleitems.series_items(text, styleguides.get(guide), next_id=len(items) + 1)
@@ -319,7 +347,9 @@ def main(argv: list[str] | None = None) -> int:
                             "suggestion", "", []))
     if items and ep is None:
         print(f"stylefix: no model endpoint available (--llm {args.llm}); "
-              f"{len(items)} ambiguous word(s) will be listed for review", file=sys.stderr)
+              f"{len(items)} ambiguous word(s) will be listed for review"
+              + ("; run `stylefix --setup` to configure one" if args.llm == "auto" else ""),
+              file=sys.stderr)
     cache = Cache(None if args.no_cache else args.cache)
     decisions = adjudicate(ep, args.target, items, cache, args.batch_size,
                            args.parallel, args.verbose)

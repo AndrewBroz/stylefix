@@ -3,7 +3,7 @@ name = "stylefix"
 version = "0.6.9"
 description = "Regularize a Markdown file to US or UK English and a style guide, using Vale plus a local LLM for the ambiguous cases."
 requires-python = ">=3.11"
-dependencies = ["spylls>=0.1.7", "adjudicate"]
+dependencies = ["spylls>=0.1.7", "adjudicate>=0.3,<0.4"]
 
 [project.scripts]
 stylefix = "stylefix.cli:main"

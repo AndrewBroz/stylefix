@@ -1,6 +1,6 @@
 """Measure adjudication accuracy and latency against a model endpoint.
 
-    uv run python scripts/eval_adjudicator.py --llm dgx [--think] [--model X] [--parallel 4]
+    uv run python scripts/eval_adjudicator.py [--url URL] [--model X] [--think] [--parallel 4]
 """
 
 from __future__ import annotations
@@ -90,16 +90,16 @@ def build_items() -> list[Item]:
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--llm", default="auto")
+    ap.add_argument("--llm", choices=["auto", "ollama", "none"], default="auto")
     ap.add_argument("--model")
     ap.add_argument("--url")
     ap.add_argument("--think", action="store_true")
     ap.add_argument("--parallel", type=int, default=4)
     ap.add_argument("--batch-size", type=int, default=20)
-    ap.add_argument("--timeout", type=float, default=120.0)
+    ap.add_argument("--timeout", type=float, default=None)
     ap.add_argument("--repeat", type=int, default=1, help="duplicate the case set N times (latency test)")
     args = ap.parse_args()
-    ep = resolve_endpoint(args.llm, args.model, args.url, think=args.think, timeout=args.timeout)
+    ep = resolve_endpoint("stylefix", args.llm, url=args.url, model=args.model, think=args.think, timeout=args.timeout)
     if ep is None:
         print("no endpoint"); return 2
     items = [it for _ in range(args.repeat) for it in build_items()]

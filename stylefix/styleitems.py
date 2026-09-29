@@ -12,8 +12,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from adjudicate import Edit, Item, protected_spans, sentence_context
-from adjudicate.context import _HTML_ENTITY
+from adjudicate import HTML_ENTITY, Edit, Item, protected_spans, sentence_context
 
 from .styleguides import StyleGuide
 
@@ -111,7 +110,7 @@ def _regions(text: str) -> list[tuple[int, int]]:
     """Prose regions for series detection: code, links, URLs, HTML tags and
     front matter are skipped, but an HTML entity is text (a series can
     contain one)."""
-    spans = [(s, e) for s, e in protected_spans(text) if not _HTML_ENTITY.fullmatch(text[s:e])]
+    spans = [(s, e) for s, e in protected_spans(text) if not HTML_ENTITY.fullmatch(text[s:e])]
     regions, cursor = [], 0
     for s, e in spans:
         if s > cursor:
