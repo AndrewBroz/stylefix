@@ -21,7 +21,8 @@ endpoint, local or hosted, without editing code.
 - Bundling Vale or LanguageTool. They stay documented prerequisites with
   the clear errors they already give.
 - Installing man pages. Wheels cannot place them; they stay in the repos.
-- Named endpoint profiles, a `config` subcommand, or a setup wizard.
+- Named endpoint profiles, or a `config` subcommand (the mode flags in §1b
+  cover setup and checking).
 - Reshaping adjudicate for users other than stylefix and proofix. It is
   published because they depend on it, at 0.x, with no stability promise.
 - mdmemo. It keeps installing stylefix from a path; switching it to the
@@ -142,6 +143,84 @@ aliases for 0.3 so an old consumer does not break mid-upgrade.
   the modules, document the config layers and the `[llm]` table, and
   replace `../` links with GitHub URLs.
 
+## 1b. Assisted setup and checking (adjudicate.setup)
+
+Five layers are powerful and confusing. Two mode flags in each CLI,
+following stylefix's `--list-styles` pattern (do one thing, exit, no input
+file), make them usable without reading this document. The logic lives in
+a new module, `adjudicate/setup.py`, parameterised by the app name and with
+injected input and output streams, so both tools share it and tests drive
+it without a terminal.
+
+### Provenance
+
+`resolve_endpoint` records where each setting came from on the endpoint:
+`Endpoint.sources: dict[str, str]`, keyed by `url`, `model`, `api_key`,
+`timeout`, `thinking_switch`. Labels: `--url`, `--model`, `--timeout` for
+flags; the variable name for env vars; the file path for config files, with
+` (api_key_env NAME)` appended when the key came through `api_key_env`;
+`local Ollama` and `listed by the server` for Ollama and discovery;
+`default` otherwise. Layers carry `(value, source)` pairs internally so
+merging keeps the labels.
+
+`list_models(ep) -> list[str] | None` returns every model id the server
+lists, or `None` if the listing fails; `discover_model` is its first entry.
+
+### `--check-endpoint`
+
+Non-interactive, safe in scripts. Honours `--llm`, `--url`, `--model`,
+`--timeout`. Prints one row per setting (name, value, source), never a key
+(`(hidden)` or `(none)`; the source column says where it came from), then
+lists models and sends one small chat request, showing its latency.
+
+Exit status: 0 the endpoint answers; 1 no endpoint, or it does not answer;
+2 a configuration error. With no endpoint it says so and suggests
+`<app> --setup`.
+
+### `--setup`
+
+Interactive; refuses with exit 2 and a pointer to the docs when stdin is
+not a terminal. End of input or Ctrl-C at any prompt cancels with exit 1
+and writes nothing.
+
+1. **Where is your model?** Local Ollama (probed first; the option shows
+   how many models it found, or that it is not running), a hosted
+   OpenAI-compatible API, or a self-hosted server (vLLM, LiteLLM,
+   llama.cpp).
+2. **URL** (not asked for Ollama). Must include a scheme. A trailing `/`
+   or `/chat/completions` is removed, and a URL not ending in `/v1` gets
+   an offer to append it.
+3. **Key** (not asked for Ollama): an environment variable name (the
+   default for a hosted API; setup warns if it is unset in this shell), a
+   pasted key (read without echo), or none (the default for self-hosted).
+   The key comes before the model because hosted APIs refuse to list
+   models without one.
+4. **Model**: the listing is probed with the key; setup reports how many
+   models it lists, or why it failed and whether to continue. Then a
+   numbered choice from the listing, plus "type a name".
+5. **Test request.** For a self-hosted server, setup sends it with
+   `thinking_switch` on: if the server accepts `chat_template_kwargs`,
+   `thinking_switch = true` is saved, and if it answers 400/422 (the field
+   is then dropped, per §1), `false`. Ollama and hosted APIs are tested
+   without it. If the request fails, setup shows the error and asks
+   whether to save anyway.
+6. **Save to** `~/.config/adjudicate/config.toml` (shared; the default) or
+   `~/.config/<app>/config.toml`. Ollama is saved as an explicit
+   `url = "<ollama>/v1"` plus `model`, so a saved Ollama choice in the
+   app file overrides a shared remote `url` instead of merging with it.
+   If the file exists, setup prints its current `[llm]` table and the new
+   one and asks before replacing; on yes, it copies the file to
+   `config.toml.bak`, replaces only the `[llm]` table and keeps every
+   other table. A file that sets llm keys as dotted top-level keys
+   (`llm.url = …`) is not edited: setup prints the new table to paste in
+   by hand. A file holding a pasted key is created or left with mode
+   `0600`.
+7. Setup finishes by running the check above, and exits with its status.
+
+When `--llm auto` finds no endpoint during a normal run, both tools say so
+on stderr and suggest `--setup` (stylefix extends its existing message;
+proofix, which says nothing today, adds one).
+
 ## 2. stylefix 0.7.0
 
 - `dependencies = ["spylls>=0.1.7", "adjudicate>=0.3,<0.4"]`. The
@@ -151,6 +230,7 @@ aliases for 0.3 so an old consumer does not break mid-upgrade.
   published adjudicate.
 - `--llm` choices become `auto | ollama | none`; the help text describes
   the config layers. `resolve_endpoint(app="stylefix", …)`.
+- `--setup` and `--check-endpoint` (§1b), in a "configuration" help group.
 - `--timeout` defaults to `None` rather than 120, in the CLI and the eval
   script, so a `timeout` in config.toml is not overridden by a flag the
   user never passed. The same rule applies to every flag that maps to a
@@ -170,7 +250,10 @@ aliases for 0.3 so an old consumer does not break mid-upgrade.
   Ollama (nothing to configure), a hosted API (`url`, `model`,
   `api_key_env`), and self-hosted vLLM (`thinking_switch = true`). The
   DGX measurements stay as one example, without the `../dgx-llm` link.
-- `man/stylefix.1`: the same `--llm` and configuration changes.
+- `man/stylefix.1`: the same `--llm` and configuration changes, the two
+  mode flags, the config files under FILES, exit status 1 for
+  `--check-endpoint`, and the version in `.TH`. The README's "The model"
+  opens with `stylefix --setup`; the TOML samples stay for hand editing.
 
 ## 3. proofix 0.5.0
 
@@ -178,14 +261,19 @@ aliases for 0.3 so an old consumer does not break mid-upgrade.
   the same `--no-sources` release build.
 - `--llm auto | ollama | none`, `resolve_endpoint(app="proofix", …)`,
   and `--timeout` defaulting to `None` as in stylefix.
+- `--setup` and `--check-endpoint` (§1b); the input file becomes optional
+  so the mode flags work without one.
+- `--help`: the description drops "local" from "a local model", and the
+  epilog gains `environment:` and `files:` blocks like stylefix's.
 - Replace the `_FENCE`/`_FRONT` imports with `FENCE`/`FRONT_MATTER`.
 - Add `LICENSE` (MIT) and `license = "MIT"`.
 - README "Install": `uv tool install proofix`; LanguageTool (Java) and
   `typos` as optional prerequisites with what is lost without each.
   Replace `../stylefix` and `../mdmemo` with their GitHub URLs, and the
   config paragraph with a pointer to the shared adjudicate config.
-- `man/proofix.1`: the `--llm {auto|dgx|ollama|none}` line and the
-  configuration text.
+- `man/proofix.1`: the `--llm {auto|dgx|ollama|none}` line, the two mode
+  flags, new ENVIRONMENT, FILES and EXIT STATUS sections, and the version
+  in `.TH`.
 
 ## 4. Release work, all three
 
@@ -203,10 +291,10 @@ aliases for 0.3 so an old consumer does not break mid-upgrade.
   its `examples/` file with `--llm none`; then, with the author's
   go-ahead, upload to PyPI. Uploads use the author's tokens; the
   implementer does not hold them.
-- The author's setup: write `~/.config/adjudicate/config.toml` with the
-  dgx gateway's URL, model alias, `api_key_env` for the LiteLLM key, and
-  `thinking_switch = true`, then run both tools once against a sample
-  file to confirm they reach the gateway.
+- The author's setup: run `stylefix --setup` against the dgx gateway
+  (self-hosted; `api_key_env` for the LiteLLM key), expecting it to detect
+  `thinking_switch = true`, then `proofix --check-endpoint` and one run of
+  each tool on a sample file. This is also the flow's real-world test.
 
 ## Testing
 
@@ -223,6 +311,17 @@ aliases for 0.3 so an old consumer does not break mid-upgrade.
 - stylefix and proofix: existing suites pass after the dependency and
   import changes. A CLI test that `--llm dgx` is rejected, and one that a
   `config.toml` URL reaches the fake server.
+- adjudicate.setup, driven by scripted answers on `io.StringIO` against
+  the fake server: each of the three paths; `thinking_switch` detected
+  true and false; URL normalisation; cancel at a prompt; refusal without
+  a terminal; replace with backup keeping other tables; dotted keys left
+  alone; mode `0600` with a pasted key; `--check-endpoint` rows, key
+  hiding and each exit status.
+- Help and man pages cannot drift: in stylefix and proofix, a test that
+  every long option from `build_parser()` appears in `man/<tool>.1`, that
+  the `--llm` choices there match the parser, that the `.TH` version
+  matches `__version__`, and that neither `--help` nor the man page
+  mentions `dgx`.
 - Release: the clean TestPyPI install above, per package.
 
 ## Risks

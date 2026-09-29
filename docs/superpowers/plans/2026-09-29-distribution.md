@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Publish adjudicate 0.3.0, stylefix 0.7.0 and proofix 0.5.0 to PyPI, each configurable to any OpenAI-compatible endpoint through layered flags, env vars and TOML config files.
+**Goal:** Publish adjudicate 0.3.0, stylefix 0.7.0 and proofix 0.5.0 to PyPI, each configurable to any OpenAI-compatible endpoint through layered flags, env vars and TOML config files, with an interactive `--setup` and a `--check-endpoint` in both CLIs, and help and man pages that a test keeps in step with the parser.
 
-**Architecture:** Endpoint resolution moves wholly into `adjudicate.llm`: `resolve_endpoint(app, …)` merges five layers (flags, `<APP>_LLM_*`, `~/.config/<app>/config.toml`, `ADJUDICATE_LLM_*`, `~/.config/adjudicate/config.toml`) and falls back to local Ollama. The `dgx` preset is deleted; the author's gateway becomes a config file. stylefix and proofix become thin callers. Release goes adjudicate → stylefix → proofix via TestPyPI.
+**Architecture:** Endpoint resolution moves wholly into `adjudicate.llm`: `resolve_endpoint(app, …)` merges five layers (flags, `<APP>_LLM_*`, `~/.config/<app>/config.toml`, `ADJUDICATE_LLM_*`, `~/.config/adjudicate/config.toml`) and falls back to local Ollama. The `dgx` preset is deleted; the author's gateway becomes a config file. `adjudicate.setup` holds the interactive setup and the provenance-printing check; stylefix and proofix become thin callers exposing them as mode flags. Release goes adjudicate → stylefix → proofix via TestPyPI.
 
 **Tech Stack:** Python ≥3.11 (stdlib `tomllib`, `urllib`, `http.server` for test fakes), hatchling (PEP 639 license metadata), uv 0.8 (`uv build --no-sources`, `uv publish`), pytest, `gh`.
 
@@ -29,13 +29,15 @@ Run each repo's commands from its own directory. Commit in the repo you changed.
 - Code license MIT, copyright "Andrew Brož". No `License ::` classifiers (PEP 639 forbids them alongside a license expression).
 - GitHub: `https://github.com/AndrewBroz/<package>`. Repo creation, pushes and every upload need the author's explicit go-ahead at that moment.
 - No `../` sibling links and no `~/Code` paths in any README, man page or help text.
+- Both CLIs have mode flags `--setup` and `--check-endpoint` in a "configuration" help group; exit statuses as spec §1b (0 works, 1 no working endpoint or cancelled, 2 configuration error or no terminal).
+- Every long option in `build_parser()` appears in the tool's man page, and the man page's `.TH` carries the package version; a test in each CLI repo enforces both.
 
 ## Review Focus
 
 1. **The author's shared config carries a dgx `model` and `thinking_switch = true`, and they pass `--url` to try another server.** Expected: nothing from the dgx layer leaks through (the model is discovered or taken from `--model`, and `chat_template_kwargs` is not sent). Pinned in Task 3 (`test_higher_url_discards_lower_server_settings`).
 2. **Default `--llm auto` on a machine where Ollama is running but no model is pulled.** Expected: the run proceeds as `--llm none`, not exit 2. Pinned in Task 3 (`test_auto_with_empty_ollama_is_none`).
 3. **Running the test suites on the author's machine, which will have a real `~/.config/adjudicate/config.toml` after Task 9.** Expected: no test reaches a real endpoint. Pinned by the autouse isolation fixture in each repo's `tests/conftest.py` (Tasks 2, 5, 7) and `test_isolation_hides_real_config` in each.
-4. **`api_key_env` naming a variable that is set but empty** (a common shell-profile slip). Expected: the same `ConfigError` as unset, not a silent unauthenticated request. Pinned in Task 3 (`test_api_key_env_empty_is_an_error`).
+4. **Running `--setup` a second time, over a config file that already has an `[llm]` table and other tables.** Expected: the old table is shown, nothing changes without a yes, a `.bak` is kept, and the other tables survive byte for byte. Pinned in Task 3b (`test_replace_keeps_other_tables_and_backs_up`, `test_declining_replace_changes_nothing`).
 5. **A malformed config file when running the CLI.** Expected: `stylefix: <path>: …` / `proofix: <path>: …` on stderr and exit 2, not a traceback. Pinned in Tasks 5 and 7 (`test_bad_config_exits_2`).
 
 ---
@@ -117,7 +119,7 @@ Stop sending vLLM's `chat_template_kwargs` by default; on 400/422 drop the offen
 - Modify: `adjudicate/adjudicate/llm.py` (the `Endpoint` class, lines 18-68)
 
 **Interfaces:**
-- Produces: `Endpoint(url, model, key="", name="custom", think=False, timeout=120.0, thinking_switch=False)`; `Endpoint.chat(system, user, timeout=None, json_mode=True) -> str` (unchanged signature); `Endpoint._headers() -> dict[str, str]`; module constant `DEFAULT_TIMEOUT = 120.0`. Fixtures `server` (a `FakeServer` with `.url`, `.base`, `.models`, `.models_status`, `.reject`, `.requests`) and autouse `isolated_llm_config`.
+- Produces: `Endpoint(url, model, key="", name="custom", think=False, timeout=120.0, thinking_switch=False)`; `Endpoint.chat(system, user, timeout=None, json_mode=True) -> str` (unchanged signature); `Endpoint._headers() -> dict[str, str]`; module constant `DEFAULT_TIMEOUT = 120.0`. Fixtures `server` (a `FakeServer` with `.url`, `.base`, `.models`, `.models_status`, `.reject`, `.requests`, `.auth`) and autouse `isolated_llm_config`.
 
 - [ ] **Step 1: Write the fixtures** — create `tests/conftest.py`:
 
@@ -153,6 +155,7 @@ class FakeServer:
         self.models_status = 200         # status for GET /v1/models
         self.reject = set()              # chat body fields answered with HTTP 400
         self.requests = []               # every chat body received, parsed
+        self.auth = []                   # Authorization header of every request
 
 
 @pytest.fixture
@@ -172,6 +175,7 @@ def server():
             self.wfile.write(data)
 
         def do_GET(self):
+            state.auth.append(self.headers.get("Authorization"))
             if self.path == "/v1/models":
                 if state.models_status != 200:
                     return self._send(state.models_status, {"error": "down"})
@@ -181,6 +185,7 @@ def server():
             self._send(404, {})
 
         def do_POST(self):
+            state.auth.append(self.headers.get("Authorization"))
             body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
             state.requests.append(body)
             bad = state.reject & body.keys()
@@ -360,10 +365,12 @@ Replace `resolve_endpoint` and delete the dgx preset. This is the core of the sp
 - Produces:
   - `class ConfigError(LLMError)`
   - `config_home() -> Path`
-  - `read_config(path: Path) -> dict` — validated `[llm]` settings with `api_key_env` already resolved into `api_key`; `{}` when the file is absent
-  - `env_layer(prefix: str) -> dict` — from `<prefix>_LLM_URL/MODEL/KEY`, keys `url`/`model`/`api_key`
-  - `merge_layers(layers: list[dict]) -> dict` — highest first
-  - `discover_model(ep: Endpoint, timeout: float = 5.0) -> str | None`
+  - `read_config(path: Path) -> dict[str, tuple[object, str]]` — validated `[llm]` settings as `{key: (value, source)}`, with `api_key_env` already resolved into `api_key`; `{}` when the file is absent
+  - `env_layer(prefix: str) -> dict[str, tuple[str, str]]` — from `<prefix>_LLM_URL/MODEL/KEY`, keys `url`/`model`/`api_key`, source the variable name
+  - `merge_layers(layers: list[dict]) -> dict[str, tuple[object, str]]` — highest first
+  - `list_models(ep: Endpoint, timeout: float = 5.0) -> list[str] | None` — every id at `/models`, `None` if the listing fails
+  - `discover_model(ep: Endpoint, timeout: float = 5.0) -> str | None` — the first of `list_models`
+  - `Endpoint.sources: dict[str, str]` — where each of `url`, `model`, `api_key`, `timeout`, `thinking_switch` came from (`api_key` absent when there is no key). Task 3b prints it.
   - `resolve_endpoint(app: str, preset: str = "auto", url: str | None = None, model: str | None = None, key: str | None = None, think: bool = False, timeout: float | None = None) -> Endpoint | None` — **`app` is now the first positional argument**; Tasks 5 and 7 call it with keywords after `app` and `preset`.
 
 - [ ] **Step 1: Write the failing tests** — create `tests/test_config.py`:
@@ -445,8 +452,29 @@ def test_higher_url_discards_lower_server_settings(isolated_llm_config, server):
 
 
 def test_merge_layers_is_field_by_field():
-    merged = merge_layers([{"model": "hi"}, {"url": "u", "model": "lo", "timeout": 5}])
-    assert merged == {"url": "u", "model": "hi", "timeout": 5}
+    merged = merge_layers([{"model": ("hi", "A")},
+                           {"url": ("u", "B"), "model": ("lo", "B"), "timeout": (5, "B")}])
+    assert merged == {"url": ("u", "B"), "model": ("hi", "A"), "timeout": (5, "B")}
+
+
+def test_sources_name_each_layer(isolated_llm_config, monkeypatch):
+    monkeypatch.setenv("MY_KEY", "k")
+    path = write(isolated_llm_config, "adjudicate",
+                 '[llm]\nurl = "http://a/v1"\nmodel = "m"\napi_key_env = "MY_KEY"\n')
+    monkeypatch.setenv("STYLEFIX_LLM_MODEL", "e")
+    ep = resolve_endpoint("stylefix", timeout=9)
+    assert ep.sources == {"url": str(path), "model": "STYLEFIX_LLM_MODEL",
+                          "api_key": f"{path} (api_key_env MY_KEY)",
+                          "timeout": "--timeout", "thinking_switch": "default"}
+
+
+def test_sources_for_discovery_and_ollama(server, monkeypatch):
+    ep = resolve_endpoint("stylefix", url=server.url)
+    assert (ep.sources["url"], ep.sources["model"]) == ("--url", "listed by the server")
+    assert "api_key" not in ep.sources
+    monkeypatch.setenv("OLLAMA_HOST", server.base)
+    ep = resolve_endpoint("stylefix")
+    assert (ep.sources["url"], ep.sources["model"]) == ("local Ollama", "local Ollama")
 
 
 # --- keys and validation ---------------------------------------------------
@@ -573,7 +601,11 @@ class ConfigError(LLMError):
     """An invalid endpoint setting; the message names the file or variable."""
 ```
 
-3. Delete `read_env_file`, `dgx_endpoint` and the old `resolve_endpoint`. Keep `ollama_endpoint` unchanged.
+3. Delete `read_env_file`, `dgx_endpoint` and the old `resolve_endpoint`. Keep `ollama_endpoint` unchanged. Add one field to `Endpoint`, after `_dropped`:
+
+```python
+    sources: dict[str, str] = field(default_factory=dict, repr=False, compare=False)
+```
 4. Append:
 
 ```python
@@ -592,8 +624,8 @@ def config_home() -> Path:
 
 
 def read_config(path: Path) -> dict:
-    """The validated [llm] table of a config file, with api_key_env resolved
-    into api_key; {} if the file does not exist."""
+    """The validated [llm] table of a config file as {key: (value, source)},
+    with api_key_env resolved into api_key; {} if the file does not exist."""
     if not path.exists():
         return {}
     try:
@@ -613,12 +645,13 @@ def read_config(path: Path) -> dict:
                               f"{' or '.join(t.__name__ for t in types)}, not {v!r}")
     if "api_key" in table and "api_key_env" in table:
         raise ConfigError(f"{path}: set api_key or api_key_env in [llm], not both")
-    out = {k: v for k, v in table.items() if k != "api_key_env"}
+    src = str(path)
+    out = {k: (v, src) for k, v in table.items() if k != "api_key_env"}
     if "api_key_env" in table:
         var = table["api_key_env"]
         if not os.environ.get(var):
             raise ConfigError(f"{path}: api_key_env names {var}, which is not set")
-        out["api_key"] = os.environ[var]
+        out["api_key"] = (os.environ[var], f"{src} (api_key_env {var})")
     return out
 
 
@@ -626,14 +659,14 @@ def env_layer(prefix: str) -> dict:
     """Settings from <prefix>_LLM_URL, _MODEL and _KEY; empty values are unset."""
     out = {}
     for key, suffix in (("url", "URL"), ("model", "MODEL"), ("api_key", "KEY")):
-        value = os.environ.get(f"{prefix}_LLM_{suffix}")
-        if value:
-            out[key] = value
+        name = f"{prefix}_LLM_{suffix}"
+        if os.environ.get(name):
+            out[key] = (os.environ[name], name)
     return out
 
 
 def merge_layers(layers: list[dict]) -> dict:
-    """Merge settings field by field, highest-precedence layer first."""
+    """Merge {key: (value, source)} layers field by field, highest first."""
     out: dict = {}
     for layer in reversed(layers):
         if "url" in layer:
@@ -643,18 +676,25 @@ def merge_layers(layers: list[dict]) -> dict:
     return out
 
 
-def discover_model(ep: Endpoint, timeout: float = 5.0) -> str | None:
-    """The first model the server lists at /models, or None."""
+def list_models(ep: Endpoint, timeout: float = 5.0) -> list[str] | None:
+    """Every model id the server lists at /models, or None if that fails."""
     req = urllib.request.Request(ep.url.rstrip("/") + "/models", headers=ep._headers())
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             data = json.load(resp)
     except Exception:
         return None
-    for m in data.get("data", []) if isinstance(data, dict) else []:
-        if isinstance(m, dict) and m.get("id"):
-            return m["id"]
-    return None
+    items = data.get("data", []) if isinstance(data, dict) else []
+    return [m["id"] for m in items if isinstance(m, dict) and m.get("id")]
+
+
+def discover_model(ep: Endpoint, timeout: float = 5.0) -> str | None:
+    models = list_models(ep, timeout)
+    return models[0] if models else None
+
+
+_FLAG_SOURCE = {"url": "--url", "model": "--model", "api_key": "key argument",
+                "timeout": "--timeout"}
 
 
 def resolve_endpoint(app: str, preset: str = "auto", url: str | None = None,
@@ -666,15 +706,16 @@ def resolve_endpoint(app: str, preset: str = "auto", url: str | None = None,
     first: the arguments, <APP>_LLM_* variables, ~/.config/<app>/config.toml,
     ADJUDICATE_LLM_* variables, ~/.config/adjudicate/config.toml; with no
     url anywhere, a local Ollama is used if one is running with a model.
-    ollama means local Ollama with only the arguments applied. Raises
-    ConfigError for an invalid setting or an endpoint with no usable model.
+    ollama means local Ollama with only the arguments applied. The result's
+    `sources` says where each setting came from. Raises ConfigError for an
+    invalid setting or an endpoint with no usable model.
     """
     if preset == "none":
         return None
     if preset not in ("auto", "ollama"):
         raise ConfigError(f"unknown endpoint preset '{preset}' (choose auto, ollama or none)")
-    flags = {k: v for k, v in (("url", url), ("model", model), ("api_key", key),
-                               ("timeout", timeout)) if v}
+    flags = {k: (v, _FLAG_SOURCE[k]) for k, v in
+             (("url", url), ("model", model), ("api_key", key), ("timeout", timeout)) if v}
     if preset == "ollama":
         settings = flags
     else:
@@ -686,26 +727,34 @@ def resolve_endpoint(app: str, preset: str = "auto", url: str | None = None,
             env_layer("ADJUDICATE"),
             read_config(home / "adjudicate" / "config.toml"),
         ])
-    t = float(settings.get("timeout", DEFAULT_TIMEOUT))
-    if "url" in settings:
-        ep = Endpoint(url=settings["url"], model=settings.get("model", ""),
-                      key=settings.get("api_key", ""), think=think, timeout=t,
-                      thinking_switch=settings.get("thinking_switch", False))
+    values = {k: v for k, (v, _) in settings.items()}
+    sources = {"timeout": "default", "thinking_switch": "default",
+               **{k: s for k, (_, s) in settings.items()}}
+    t = float(values.get("timeout", DEFAULT_TIMEOUT))
+    if "url" in values:
+        ep = Endpoint(url=values["url"], model=values.get("model", ""),
+                      key=values.get("api_key", ""), think=think, timeout=t,
+                      thinking_switch=values.get("thinking_switch", False))
     else:
         ep = ollama_endpoint()
         if ep is None:
             return None
-        ep.model = settings.get("model") or ep.model
-        ep.key = settings.get("api_key", "")
+        sources["url"] = "local Ollama"
+        if not values.get("model") and ep.model:
+            sources["model"] = "local Ollama"
+        ep.model = values.get("model") or ep.model
+        ep.key = values.get("api_key", "")
         ep.think, ep.timeout = think, t
-        ep.thinking_switch = settings.get("thinking_switch", False)
+        ep.thinking_switch = values.get("thinking_switch", False)
     if not ep.model:
         ep.model = discover_model(ep) or ""
+        sources["model"] = "listed by the server"
     if not ep.model:
         if ep.name == "ollama" and preset == "auto":
             return None          # Ollama is running but has no model pulled
         raise ConfigError(f"no model set for {ep.url} and the server lists none; "
                           "set `model` in config.toml or pass --model")
+    ep.sources = sources
     return ep
 ```
 
@@ -714,7 +763,7 @@ def resolve_endpoint(app: str, preset: str = "auto", url: str | None = None,
 - [ ] **Step 4: Run the new tests, then the whole suite**
 
 Run: `uv run pytest tests/test_config.py -v` — Expected: all PASS.
-Run: `uv run pytest -q` — Expected: 55 passed (21 + 7 + 27).
+Run: `uv run pytest -q` — Expected: 57 passed (21 + 7 + 29).
 
 - [ ] **Step 5: Confirm nothing mentions dgx any more**
 
@@ -725,7 +774,580 @@ Expected: no output (the `STYLEFIX` in `tests/conftest.py` is the isolation list
 
 ```bash
 git add adjudicate/llm.py adjudicate/__init__.py tests/test_config.py
-git commit -m "Endpoint from layered flags, env and config.toml per app; model discovery; dgx preset removed"
+git commit -m "Endpoint from layered flags, env and config.toml per app, with the source of each setting; model discovery; dgx preset removed"
+```
+
+---
+
+### Task 3b: adjudicate — `setup` module: interactive setup and endpoint check
+
+The shared logic behind `--setup` and `--check-endpoint` in both CLIs. Re-read spec §1b first. Everything takes injected streams so tests run without a terminal.
+
+**Files:**
+- Create: `adjudicate/adjudicate/setup.py`
+- Create: `adjudicate/tests/test_setup.py`
+- Modify: `adjudicate/adjudicate/__init__.py` (export `check_endpoint`, `run_setup`)
+
+**Interfaces:**
+- Consumes: `resolve_endpoint`, `list_models`, `ollama_endpoint`, `config_home`, `ConfigError`, `LLMError`, `Endpoint` (with `_dropped` and `sources`) from Tasks 2 and 3; fixtures `server` and `isolated_llm_config`.
+- Produces:
+  - `check_endpoint(app: str, out: TextIO | None = None, preset: str = "auto", url: str | None = None, model: str | None = None, timeout: float | None = None) -> int` — prints the resolved settings and a live test; returns 0 (works), 1 (no endpoint, or it does not answer), 2 (config error)
+  - `run_setup(app: str, inp: TextIO | None = None, out: TextIO | None = None, require_tty: bool = True) -> int` — returns 0 when saved and the check passes, 1 when cancelled, declined or the check fails, 2 when stdin is not a terminal
+  - Tasks 5 and 7 call both with `app="stylefix"` / `app="proofix"`.
+
+- [ ] **Step 1: Write the failing tests** — create `tests/test_setup.py`:
+
+```python
+import io
+import os
+import stat
+import tomllib
+
+import pytest
+
+from adjudicate.setup import check_endpoint, run_setup
+
+
+def setup(answers, app="stylefix"):
+    """Run setup on scripted answers, one per prompt; returns (status, output)."""
+    out = io.StringIO()
+    status = run_setup(app, io.StringIO("".join(a + "\n" for a in answers)), out,
+                       require_tty=False)
+    return status, out.getvalue()
+
+
+def shared(xdg):
+    return xdg / "adjudicate" / "config.toml"
+
+
+def llm(path):
+    return tomllib.loads(path.read_text())["llm"]
+
+
+# --- the three paths --------------------------------------------------------
+
+def test_self_hosted_detects_thinking_switch(isolated_llm_config, server):
+    # kind 3 (self-hosted), url, key 3 (none), model 1, save 1 (shared)
+    status, out = setup(["3", server.url, "3", "1", "1"])
+    assert status == 0, out
+    assert llm(shared(isolated_llm_config)) == {
+        "url": server.url, "model": "served-model", "thinking_switch": True}
+    assert server.requests[0]["chat_template_kwargs"] == {"enable_thinking": False}
+    assert "thinking_switch = true" in out
+
+
+def test_self_hosted_that_rejects_thinking_switch(isolated_llm_config, server):
+    server.reject = {"chat_template_kwargs"}
+    status, out = setup(["3", server.url, "3", "1", "1"])
+    assert status == 0, out
+    assert llm(shared(isolated_llm_config))["thinking_switch"] is False
+
+
+def test_hosted_with_env_key(isolated_llm_config, server, monkeypatch):
+    monkeypatch.setenv("TEST_KEY", "k")
+    # kind 2 (hosted), url, key 1 (env var), var name, model 1, save 1
+    status, out = setup(["2", server.url, "1", "TEST_KEY", "1", "1"])
+    assert status == 0, out
+    assert llm(shared(isolated_llm_config)) == {
+        "url": server.url, "model": "served-model", "api_key_env": "TEST_KEY"}
+    assert server.auth[0] == "Bearer k"              # the listing was asked with the key
+    assert "chat_template_kwargs" not in server.requests[0]
+
+
+def test_ollama_saved_to_app_file_as_explicit_url(isolated_llm_config, server, monkeypatch):
+    monkeypatch.setenv("OLLAMA_HOST", server.base)
+    # kind 1 (Ollama), model 1, save 2 (stylefix only)
+    status, out = setup(["1", "1", "2"])
+    assert status == 0, out
+    assert llm(isolated_llm_config / "stylefix" / "config.toml") == {
+        "url": server.url, "model": "served-model"}
+    assert not shared(isolated_llm_config).exists()
+
+
+def test_ollama_not_running(isolated_llm_config):
+    status, out = setup(["1"])
+    assert status == 1 and "ollama serve" in out
+    assert not shared(isolated_llm_config).exists()
+
+
+def test_typed_model_name(isolated_llm_config, server):
+    # model 2 = "Other (type a name)"
+    status, out = setup(["3", server.url, "3", "2", "my-model", "1"])
+    assert status == 0, out
+    assert llm(shared(isolated_llm_config))["model"] == "my-model"
+
+
+# --- URL handling -------------------------------------------------------------
+
+def test_url_without_scheme_is_asked_again(isolated_llm_config, server):
+    status, out = setup(["3", "gpu:8000/v1", server.base + "/v1/chat/completions/", "3", "1", "1"])
+    assert status == 0, out
+    assert "include the scheme" in out
+    assert llm(shared(isolated_llm_config))["url"] == server.url
+
+
+def test_v1_offered_and_appended(isolated_llm_config, server):
+    status, out = setup(["3", server.base, "y", "3", "1", "1"])
+    assert status == 0, out
+    assert llm(shared(isolated_llm_config))["url"] == server.url
+
+
+def test_unlistable_server_asks_to_continue(isolated_llm_config, server):
+    server.models_status = 500
+    status, out = setup(["3", server.url, "3", "n"])
+    assert status == 1 and "could not list models" in out
+    assert not shared(isolated_llm_config).exists()
+
+
+# --- keys -----------------------------------------------------------------------
+
+def test_pasted_key_is_saved_0600_and_never_shown(isolated_llm_config, server):
+    status, out = setup(["2", server.url, "2", "sekrit", "1", "1"])
+    assert status == 0, out
+    path = shared(isolated_llm_config)
+    assert llm(path)["api_key"] == "sekrit"
+    assert stat.S_IMODE(os.stat(path).st_mode) == 0o600
+    assert "sekrit" not in out
+
+
+def test_unset_env_key_warns(isolated_llm_config, server):
+    status, out = setup(["2", server.url, "1", "NOT_SET_ANYWHERE", "1", "1"])
+    assert "NOT_SET_ANYWHERE is not set" in out
+    # saved even so; the check afterwards fails with the ConfigError for the unset variable
+    assert llm(shared(isolated_llm_config))["api_key_env"] == "NOT_SET_ANYWHERE"
+    assert status == 2
+
+
+# --- existing files -------------------------------------------------------------
+
+OLD = '[llm]\nurl = "http://old/v1"\nmodel = "old"\n\n[other]\nx = 1\n'
+
+
+def test_replace_keeps_other_tables_and_backs_up(isolated_llm_config, server):
+    path = shared(isolated_llm_config)
+    path.parent.mkdir(parents=True)
+    path.write_text(OLD)
+    status, out = setup(["3", server.url, "3", "1", "1", "y"])
+    assert status == 0, out
+    assert "already has" in out and "http://old/v1" in out
+    assert path.with_name("config.toml.bak").read_text() == OLD
+    data = tomllib.loads(path.read_text())
+    assert data["llm"]["url"] == server.url and data["other"] == {"x": 1}
+
+
+def test_declining_replace_changes_nothing(isolated_llm_config, server):
+    path = shared(isolated_llm_config)
+    path.parent.mkdir(parents=True)
+    path.write_text(OLD)
+    status, out = setup(["3", server.url, "3", "1", "1", "n"])
+    assert status == 1
+    assert path.read_text() == OLD
+    assert not path.with_name("config.toml.bak").exists()
+
+
+def test_other_tables_only_gets_llm_appended(isolated_llm_config, server):
+    path = shared(isolated_llm_config)
+    path.parent.mkdir(parents=True)
+    path.write_text("[other]\nx = 1\n")
+    status, out = setup(["3", server.url, "3", "1", "1"])
+    assert status == 0, out
+    data = tomllib.loads(path.read_text())
+    assert data["other"] == {"x": 1} and data["llm"]["url"] == server.url
+
+
+def test_dotted_keys_are_not_edited(isolated_llm_config, server):
+    path = shared(isolated_llm_config)
+    path.parent.mkdir(parents=True)
+    path.write_text('llm.url = "http://old/v1"\n')
+    status, out = setup(["3", server.url, "3", "1", "1"])
+    assert status == 1 and "by hand" in out and f'url = "{server.url}"' in out
+    assert path.read_text() == 'llm.url = "http://old/v1"\n'
+
+
+# --- cancelling and terminals -----------------------------------------------------
+
+def test_end_of_input_cancels(isolated_llm_config):
+    status, out = setup(["3"])            # input ends at the URL prompt
+    assert status == 1 and "cancelled" in out
+    assert not shared(isolated_llm_config).exists()
+
+
+def test_refuses_without_a_terminal(isolated_llm_config):
+    out = io.StringIO()
+    assert run_setup("stylefix", io.StringIO(""), out) == 2
+    assert "terminal" in out.getvalue()
+
+
+# --- check_endpoint ---------------------------------------------------------------
+
+def check(**kw):
+    out = io.StringIO()
+    return check_endpoint("stylefix", out, **kw), out.getvalue()
+
+
+def test_check_with_nothing_configured():
+    status, out = check()
+    assert status == 1 and "stylefix --setup" in out
+
+
+def test_check_config_error(isolated_llm_config):
+    path = shared(isolated_llm_config)
+    path.parent.mkdir(parents=True)
+    path.write_text("[llm\n")
+    status, out = check()
+    assert status == 2 and str(path) in out
+
+
+def test_check_prints_sources_and_hides_the_key(isolated_llm_config, server, monkeypatch):
+    monkeypatch.setenv("TEST_KEY", "sekrit")
+    path = shared(isolated_llm_config)
+    path.parent.mkdir(parents=True)
+    path.write_text(f'[llm]\nurl = "{server.url}"\nmodel = "m"\napi_key_env = "TEST_KEY"\n')
+    status, out = check()
+    assert status == 0, out
+    lines = {line.split()[0]: line for line in out.splitlines() if line.strip()}
+    assert server.url in lines["url"] and str(path) in lines["url"]
+    assert "(hidden)" in lines["api_key"] and "api_key_env TEST_KEY" in lines["api_key"]
+    assert "default" in lines["timeout"]
+    assert "sekrit" not in out
+    assert "chat ✓" in out
+
+
+def test_check_endpoint_that_does_not_answer():
+    status, out = check(url="http://127.0.0.1:9/v1", model="m")
+    assert status == 1 and "chat ✗" in out
+```
+
+That is 21 tests.
+
+- [ ] **Step 2: Run them to verify they fail**
+
+Run: `uv run pytest tests/test_setup.py -v`
+Expected: collection error, `ModuleNotFoundError: No module named 'adjudicate.setup'`
+
+- [ ] **Step 3: Implement** — create `adjudicate/setup.py`:
+
+```python
+"""Interactive endpoint setup (--setup) and a non-interactive check
+(--check-endpoint), shared by the tools built on adjudicate."""
+
+from __future__ import annotations
+
+import getpass
+import json
+import os
+import re
+import shutil
+import sys
+import time
+import tomllib
+from pathlib import Path
+from typing import TextIO
+
+from .llm import (ConfigError, Endpoint, LLMError, config_home, list_models,
+                  ollama_endpoint, resolve_endpoint)
+
+ROWS = ("url", "model", "api_key", "timeout", "thinking_switch")
+PING = 'Answer with the JSON object {"ok": true} and nothing else.'
+_KEY_ORDER = ("url", "model", "api_key", "api_key_env", "timeout", "thinking_switch")
+_VAR_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+_LLM_HEADER = re.compile(r"^[ \t]*\[llm\][ \t]*(?:#.*)?$", re.M)
+_ANY_HEADER = re.compile(r"^[ \t]*\[", re.M)
+
+
+class SetupCancelled(Exception):
+    pass
+
+
+class Prompter:
+    """Numbered choices and questions over any pair of text streams."""
+
+    def __init__(self, inp: TextIO, out: TextIO):
+        self.inp, self.out = inp, out
+
+    def _line(self, prompt: str) -> str:
+        self.out.write(prompt)
+        self.out.flush()
+        line = self.inp.readline()
+        if not line:
+            raise SetupCancelled
+        return line.strip()
+
+    def ask(self, question: str, default: str = "") -> str:
+        hint = f" [{default}]" if default else ""
+        while True:
+            answer = self._line(f"{question}{hint}: ") or default
+            if answer:
+                return answer
+
+    def secret(self, question: str) -> str:
+        if self.inp is sys.stdin and sys.stdin.isatty():
+            while True:
+                try:
+                    answer = getpass.getpass(f"{question}: ", stream=self.out).strip()
+                except EOFError:
+                    raise SetupCancelled from None
+                if answer:
+                    return answer
+        return self.ask(question)
+
+    def choose(self, question: str, options: list[str], default: int = 0) -> int:
+        self.out.write(question + "\n")
+        for i, option in enumerate(options, 1):
+            self.out.write(f"  {i}. {option}\n")
+        while True:
+            answer = self._line(f"> [{default + 1}] ") or str(default + 1)
+            if answer.isdigit() and 1 <= int(answer) <= len(options):
+                return int(answer) - 1
+            self.out.write(f"  choose 1-{len(options)}\n")
+
+    def confirm(self, question: str, default: bool = True) -> bool:
+        hint = "Y/n" if default else "y/N"
+        while True:
+            answer = self._line(f"{question} [{hint}] ").lower()
+            if not answer:
+                return default
+            if answer in ("y", "yes"):
+                return True
+            if answer in ("n", "no"):
+                return False
+
+
+def llm_table(values: dict, hide_key: bool = False) -> str:
+    """values as a TOML [llm] table, keys in a fixed order."""
+    lines = ["[llm]"]
+    for k in _KEY_ORDER:
+        if k not in values:
+            continue
+        v = values[k]
+        if k == "api_key" and hide_key:
+            text = '"(hidden)"'
+        elif isinstance(v, bool):
+            text = "true" if v else "false"
+        elif isinstance(v, str):
+            text = json.dumps(v)          # a JSON string is a valid TOML basic string
+        else:
+            text = repr(v)
+        lines.append(f"{k} = {text}")
+    return "\n".join(lines) + "\n"
+
+
+def replace_llm_table(text: str, table: str) -> str | None:
+    """text with its [llm] table replaced by table, or table appended if
+    there is none; None if llm keys are set some other way (dotted keys,
+    an inline table), which is left for the user to edit."""
+    m = _LLM_HEADER.search(text)
+    if m is None:
+        if "llm" in tomllib.loads(text):
+            return None
+        new = text.rstrip("\n") + ("\n\n" if text.strip() else "") + table
+    else:
+        nxt = _ANY_HEADER.search(text, m.end())
+        end = nxt.start() if nxt else len(text)
+        rest = text[end:]
+        new = text[:m.start()] + table + ("\n" + rest if rest else "")
+    try:
+        if tomllib.loads(new).get("llm") != tomllib.loads(table)["llm"]:
+            return None
+    except tomllib.TOMLDecodeError:
+        return None
+    return new
+
+
+def save_config(path: Path, values: dict, p: Prompter, secret: bool) -> bool:
+    """Write values as the [llm] table of path, asking before replacing one."""
+    out, table = p.out, llm_table(values)
+    shown = llm_table(values, hide_key=True)
+    if path.exists():
+        text = path.read_text(encoding="utf-8")
+        try:
+            current = tomllib.loads(text).get("llm")
+            new_text = replace_llm_table(text, table)
+        except tomllib.TOMLDecodeError as e:
+            out.write(f"{path} is not valid TOML ({e}); not editing it.\n")
+            current, new_text = None, None
+        if new_text is None:
+            out.write(f"Add this to {path} by hand"
+                      f"{' (with your key in place of (hidden))' if secret else ''}:\n\n{shown}\n")
+            return False
+        if current is not None:
+            out.write(f"{path} already has:\n\n{llm_table(current, hide_key=True)}\n"
+                      f"Replace it with:\n\n{shown}\n")
+            if not p.confirm("Replace?", default=False):
+                out.write("Left unchanged.\n")
+                return False
+        shutil.copy2(path, path.with_name(path.name + ".bak"))
+    else:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        new_text = table
+    path.write_text(new_text, encoding="utf-8")
+    if secret:
+        os.chmod(path, 0o600)
+    out.write(f"Wrote {path}\n")
+    return True
+
+
+def _ask_url(p: Prompter) -> str:
+    while True:
+        url = p.ask("Base URL (ending in /v1)").strip().rstrip("/")
+        if url.endswith("/chat/completions"):
+            url = url[: -len("/chat/completions")]
+        if "://" not in url:
+            p.out.write("  include the scheme, e.g. http://gpu-box:8000/v1\n")
+            continue
+        if not url.endswith("/v1") and p.confirm(f"  Add /v1, giving {url}/v1?", default=True):
+            url += "/v1"
+        return url
+
+
+def _plural(n: int, word: str) -> str:
+    return f"{n} {word}{'' if n == 1 else 's'}"
+
+
+def _setup(app: str, p: Prompter) -> int:
+    out = p.out
+    ollama = ollama_endpoint()
+    ollama_models = (list_models(ollama) or []) if ollama else []
+    ollama_label = ("Local Ollama (not running)" if ollama is None
+                    else f"Local Ollama (found: {_plural(len(ollama_models), 'model')})")
+    kind = p.choose("Where is your model?",
+                    [ollama_label, "A hosted API (OpenAI-compatible)",
+                     "A self-hosted server (vLLM, LiteLLM, llama.cpp)"],
+                    default=0 if ollama_models else 1)
+    values: dict = {}
+    secret = False
+    if kind == 0:
+        host = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
+        if ollama is None:
+            out.write(f"Ollama is not answering at {host}. Start it (`ollama serve`), pull a "
+                      "model (`ollama pull <name>`), and run setup again.\n")
+            return 1
+        if not ollama_models:
+            out.write("Ollama is running but has no models. Pull one (`ollama pull <name>`) "
+                      "and run setup again.\n")
+            return 1
+        ep = Endpoint(ollama.url, ollama_models[p.choose("Model:", ollama_models)], name="ollama")
+    else:
+        url = _ask_url(p)
+        ep = Endpoint(url, "")
+        k = p.choose("API key:", ["From an environment variable (recommended)",
+                                  "Paste it (saved in the config file, mode 0600)", "None"],
+                     default=0 if kind == 1 else 2)
+        if k == 0:
+            while not _VAR_NAME.match(var := p.ask("Variable name")):
+                out.write("  a variable name is letters, digits and _\n")
+            values["api_key_env"] = var
+            ep.key = os.environ.get(var, "")
+            out.write(f"  {var} is set ✓\n" if ep.key else
+                      f"  {var} is not set in this shell; testing without a key. "
+                      f"Set it before using {app}.\n")
+        elif k == 1:
+            ep.key = values["api_key"] = p.secret("API key")
+            secret = True
+        models = list_models(ep)
+        if models is None:
+            out.write(f"  ✗ could not list models at {url}/models\n")
+            if not p.confirm("Continue anyway?", default=False):
+                return 1
+            models = []
+        else:
+            out.write(f"  ✓ reachable; lists {_plural(len(models), 'model')}\n")
+        options = models + ["Other (type a name)"]
+        choice = p.choose("Model:", options) if models else len(models)
+        ep.model = options[choice] if choice < len(models) else p.ask("Model name")
+    values["url"], values["model"] = ep.url, ep.model
+
+    out.write("Testing a request... ")
+    out.flush()
+    ep.thinking_switch = kind == 2
+    t0 = time.monotonic()
+    try:
+        ep.chat(PING, "ping", timeout=min(ep.timeout, 30))
+    except LLMError as e:
+        out.write(f"✗\n  {e}\n")
+        if not p.confirm("Save anyway?", default=False):
+            return 1
+    else:
+        out.write(f"✓ {time.monotonic() - t0:.1f} s\n")
+        if kind == 2:
+            accepted = "chat_template_kwargs" not in ep._dropped
+            values["thinking_switch"] = accepted
+            out.write("  server accepts enable_thinking → thinking_switch = true\n" if accepted
+                      else "  server rejects enable_thinking → thinking_switch = false\n")
+
+    shared, own = config_home() / "adjudicate" / "config.toml", config_home() / app / "config.toml"
+    where = p.choose("Save to:", [f"{shared} (shared by every tool that uses adjudicate)",
+                                  f"{own} ({app} only)"])
+    if not save_config((shared, own)[where], values, p, secret):
+        return 1
+    out.write("\n")
+    return check_endpoint(app, out)
+
+
+def run_setup(app: str, inp: TextIO | None = None, out: TextIO | None = None,
+              require_tty: bool = True) -> int:
+    """Ask where the model is, test it, and save the [llm] table."""
+    inp, out = inp or sys.stdin, out or sys.stdout
+    if require_tty and not inp.isatty():
+        out.write(f"{app} --setup asks questions, so it needs a terminal. To configure "
+                  f"without one, write the [llm] table by hand (see `{app} --help`).\n")
+        return 2
+    try:
+        return _setup(app, Prompter(inp, out))
+    except (SetupCancelled, KeyboardInterrupt):
+        out.write("\nSetup cancelled; nothing was written.\n")
+        return 1
+
+
+def check_endpoint(app: str, out: TextIO | None = None, preset: str = "auto",
+                   url: str | None = None, model: str | None = None,
+                   timeout: float | None = None) -> int:
+    """Print each resolved setting and where it came from, then test the endpoint."""
+    out = out or sys.stdout
+    try:
+        ep = resolve_endpoint(app, preset, url=url, model=model, timeout=timeout)
+    except ConfigError as e:
+        out.write(f"{app}: {e}\n")
+        return 2
+    if ep is None:
+        why = ("--llm none: no model is used." if preset == "none" else
+               "No endpoint: nothing is configured and no local Ollama with a model is running.")
+        out.write(f"{why}\nRun `{app} --setup` to configure one.\n")
+        return 1
+    shown = {"url": ep.url, "model": ep.model,
+             "api_key": "(hidden)" if ep.key else "(none)",
+             "timeout": f"{ep.timeout:g}", "thinking_switch": str(ep.thinking_switch).lower()}
+    width = max(len(v) for v in shown.values())
+    for name in ROWS:
+        out.write(f"{name:<16} {shown[name]:<{width}}  {ep.sources.get(name, '')}".rstrip() + "\n")
+    models = list_models(ep)
+    listing = "✗" if models is None else f"✓ {_plural(len(models), 'model')}"
+    t0 = time.monotonic()
+    try:
+        ep.chat(PING, "ping", timeout=min(ep.timeout, 30))
+    except LLMError as e:
+        out.write(f"/models {listing}   chat ✗ {e}\n")
+        return 1
+    out.write(f"/models {listing}   chat ✓ {time.monotonic() - t0:.1f} s\n")
+    return 0
+```
+
+In `adjudicate/__init__.py`, add `from .setup import check_endpoint, run_setup  # noqa: F401`.
+
+- [ ] **Step 4: Run the new tests, then the whole suite**
+
+Run: `uv run pytest tests/test_setup.py -v` — Expected: 21 passed.
+Run: `uv run pytest -q` — Expected: 78 passed (57 + 21).
+
+If a scripted-answer test fails because a prompt was added or reordered, fix the implementation to match spec §1b, not the answer list; the lists encode the spec's order (kind, URL, key, model, test, save, replace).
+
+- [ ] **Step 5: Try it by hand once** — against the fake nothing: `uv run python -c "from adjudicate import run_setup; raise SystemExit(run_setup('stylefix'))"` in a terminal, choose 2, give `http://127.0.0.1:9/v1`, choose None, answer `n` to "Continue anyway?". Expected: the prompts read cleanly, exit status 1, nothing written.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add adjudicate/setup.py adjudicate/__init__.py tests/test_setup.py
+git commit -m "setup module: interactive --setup that tests and saves [llm], and a --check-endpoint that shows each setting's source"
 ```
 
 ---
@@ -817,7 +1439,9 @@ pip install adjudicate
 Modules: `llm` (OpenAI-compatible client and endpoint resolution), `core`
 (Item, Decision, Cache, `adjudicate`), `apply` (Edit, `apply_edits`),
 `context` (sentence context, Markdown prose regions), `dictionary`
-(Hunspell lookups over the bundled en_US and en_GB dictionaries).
+(Hunspell lookups over the bundled en_US and en_GB dictionaries), `setup`
+(`run_setup` and `check_endpoint`, behind the tools' `--setup` and
+`--check-endpoint`).
 
 ## Choosing the model endpoint
 
@@ -862,7 +1486,7 @@ keep their own licenses: en_US under the SCOWL notice in
 - [ ] **Step 4: Build and inspect**
 
 Run: `uv run pytest -q && rm -rf dist && uv build --no-sources`
-Expected: 55 passed; `Successfully built dist/adjudicate-0.3.0.tar.gz` and `…-py3-none-any.whl`.
+Expected: 78 passed; `Successfully built dist/adjudicate-0.3.0.tar.gz` and `…-py3-none-any.whl`.
 
 Run: `unzip -l dist/adjudicate-0.3.0-py3-none-any.whl | grep -i licen && unzip -p dist/adjudicate-0.3.0-py3-none-any.whl 'adjudicate-0.3.0.dist-info/METADATA' | grep -E "^(License-Expression|License-File|Project-URL|Requires-Dist)"`
 Expected: `LICENSE`, `LICENSE-en_US.txt`, `LICENSE-en_GB.txt` listed; `License-Expression: MIT AND LGPL-2.0-or-later AND LicenseRef-SCOWL`; two `Project-URL` lines; `Requires-Dist: spylls>=0.1.7`. If hatchling rejects the expression or `license-files`, stop and report the exact error; do not drop the LGPL or SCOWL terms to make it build.
@@ -881,10 +1505,10 @@ git commit -m "MIT license, dictionary licenses declared, PyPI metadata, README 
 **Files:**
 - Create: `stylefix/tests/conftest.py`
 - Create: `stylefix/tests/test_endpoint_cli.py`
-- Modify: `stylefix/pyproject.toml:6` (dependency), `stylefix/stylefix/cli.py` (lines 17, 42-72 epilog, 130-133, 147, 292-293), `stylefix/stylefix/styleitems.py:16,114`, `stylefix/scripts/eval_adjudicator.py` (lines 3, 93-102)
+- Modify: `stylefix/pyproject.toml:6` (dependency), `stylefix/stylefix/cli.py` (lines 17, 42-72 epilog, 130-133, 147, the start of `main`, 292-293, the "no model endpoint available" message), `stylefix/stylefix/styleitems.py:16,114`, `stylefix/scripts/eval_adjudicator.py` (lines 3, 93-102)
 
 **Interfaces:**
-- Consumes: `resolve_endpoint(app, preset, url=, model=, key=, think=, timeout=)`, `ConfigError`, `HTML_ENTITY` (Tasks 1 and 3).
+- Consumes: `resolve_endpoint(app, preset, url=, model=, key=, think=, timeout=)`, `ConfigError`, `HTML_ENTITY` (Tasks 1 and 3); `run_setup(app)`, `check_endpoint(app, preset=, url=, model=, timeout=)` (Task 3b).
 
 - [ ] **Step 1: Test isolation** — create `tests/conftest.py`:
 
@@ -912,6 +1536,7 @@ Do not run the suite yet: stylefix resolves adjudicate from `../adjudicate`, now
 - [ ] **Step 2: Write the failing CLI tests** — create `tests/test_endpoint_cli.py`:
 
 ```python
+import io
 import json
 import os
 import threading
@@ -974,6 +1599,24 @@ def chat_server():
     httpd.server_close()
 
 
+def test_no_endpoint_suggests_setup(tmp_path, capsys):
+    src = tmp_path / "d.md"
+    src.write_text(DOC)
+    assert main([str(src), "--target", "uk", "--no-cache", "--dry-run"]) == 0
+    assert "stylefix --setup" in capsys.readouterr().err
+
+
+def test_check_endpoint_needs_no_input_file(capsys):
+    assert main(["--check-endpoint"]) == 1          # nothing configured in the isolated home
+    assert "stylefix --setup" in capsys.readouterr().out
+
+
+def test_setup_needs_a_terminal(monkeypatch, capsys):
+    monkeypatch.setattr("sys.stdin", io.StringIO(""))
+    assert main(["--setup"]) == 2
+    assert "terminal" in capsys.readouterr().out
+
+
 def test_config_url_reaches_the_server(isolated_llm_config, tmp_path, chat_server):
     url, received = chat_server
     cfg = isolated_llm_config / "adjudicate" / "config.toml"
@@ -990,7 +1633,7 @@ def test_config_url_reaches_the_server(isolated_llm_config, tmp_path, chat_serve
 - [ ] **Step 3: Run them to verify they fail**
 
 Run: `uv run pytest tests/test_endpoint_cli.py -v`
-Expected: `test_dgx_preset_is_gone` FAIL (dgx still a choice); `test_timeout_flag_defaults_to_none` FAIL (120.0); `test_bad_config_exits_2` FAIL with `TypeError` from the old positional call or a traceback; `test_config_url_reaches_the_server` FAIL.
+Expected: `test_dgx_preset_is_gone` FAIL (dgx still a choice); `test_timeout_flag_defaults_to_none` FAIL (120.0); `test_bad_config_exits_2`, `test_no_endpoint_suggests_setup` and `test_config_url_reaches_the_server` FAIL with `ConfigError` from the old positional call; `test_check_endpoint_needs_no_input_file` and `test_setup_needs_a_terminal` FAIL (unrecognized arguments).
 
 - [ ] **Step 4: Implement**
 
@@ -998,7 +1641,12 @@ Expected: `test_dgx_preset_is_gone` FAIL (dgx still a choice); `test_timeout_fla
 
 `stylefix/cli.py`:
 - line 17: `from .llm import ConfigError, resolve_endpoint`
-- epilog first example: replace "ambiguous words decided by the first reachable model (DGX, then Ollama)" with "ambiguous words decided by the configured model, or local Ollama"
+- epilog first example: replace "ambiguous words decided by the first reachable model (DGX, then Ollama)" with "ambiguous words decided by the configured model, or local Ollama", and add as the new first example:
+
+```
+  stylefix --setup
+      choose and test a model endpoint, and save it for stylefix and proofix
+```
 - epilog `environment:` block becomes:
 
 ```
@@ -1030,6 +1678,30 @@ environment:
 ```
 
 - the `--timeout` argument: `default=None`, help `"seconds to wait for one model request (default: 120, or timeout in config.toml)"`
+- after the model group, a configuration group:
+
+```python
+    c = p.add_argument_group("configuration", "set up or check the model endpoint, then exit")
+    c.add_argument("--setup", action="store_true",
+                   help="choose a model endpoint interactively, test it, and save it to "
+                        "~/.config/adjudicate/config.toml or ~/.config/stylefix/config.toml")
+    c.add_argument("--check-endpoint", action="store_true",
+                   help="show the endpoint stylefix would use and where each setting comes "
+                        "from, then test it; exit 0 if it answers, 1 if not, 2 on a config error")
+```
+
+- at the top of `main`, directly after `args = build_parser().parse_args(argv)` and before the `--list-styles` check:
+
+```python
+    if args.setup:
+        return run_setup("stylefix")
+    if args.check_endpoint:
+        return check_endpoint("stylefix", preset=args.llm, url=args.url, model=args.model,
+                              timeout=args.timeout)
+```
+
+  with `from adjudicate import check_endpoint, run_setup` added to the imports.
+- the message printed when `items and ep is None`: append `; run `stylefix --setup` to configure one` when `args.llm == "auto"`, so for `auto` it reads `stylefix: no model endpoint available (--llm auto); 1 ambiguous word(s) will be listed for review; run `stylefix --setup` to configure one`
 - the `resolve_endpoint` call in `main`:
 
 ```python
@@ -1050,7 +1722,7 @@ Then refresh the lock: `uv lock`.
 - [ ] **Step 5: Run the whole suite**
 
 Run: `uv run pytest -q`
-Expected: 118 passed. **If a test that passed before this task fails now** (other than the four new ones), the isolation fixture exposed a dependence on a live model or on the real `~/.config/stylefix/accept.txt`: report which test and why, and do not weaken the fixture to make it pass.
+Expected: 121 passed. **If a test that passed before this task fails now** (other than the new ones in `test_endpoint_cli.py`), the isolation fixture exposed a dependence on a live model or on the real `~/.config/stylefix/accept.txt`: report which test and why, and do not weaken the fixture to make it pass.
 Also run `grep -rn -i "dgx\|_HTML_ENTITY" stylefix scripts` — expected: no output.
 
 - [ ] **Step 6: Commit** (this includes the pre-existing one-line `uv.lock` version catch-up)
@@ -1068,6 +1740,46 @@ git commit -m "Endpoint from adjudicate 0.3's config layers; --llm auto|ollama|n
 - Create: `stylefix/LICENSE` (the MIT text from Task 4, Step 1, verbatim)
 - Delete: `stylefix/stylefix/dict/LICENSE-en_GB.txt`, `stylefix/stylefix/dict/LICENSE-en_US.txt`
 - Modify: `stylefix/pyproject.toml`, `stylefix/stylefix/__init__.py:3`, `stylefix/README.md`, `stylefix/man/stylefix.1`
+- Create: `stylefix/tests/test_docs.py`
+
+- [ ] **Step 0: The drift test** — create `tests/test_docs.py`, run it, and expect failures (the man page says 0.6.0 and lacks the new flags); Step 4 makes it pass:
+
+```python
+"""The man page and --help must keep up with the parser."""
+
+import re
+from pathlib import Path
+
+from stylefix import __version__
+from stylefix.cli import build_parser
+
+MAN = (Path(__file__).parent.parent / "man" / "stylefix.1").read_text(encoding="utf-8")
+PLAIN = MAN.replace("\\-", "-")          # roff writes --llm as \-\-llm
+
+
+def test_every_long_option_is_in_the_man_page():
+    missing = [o for a in build_parser()._actions for o in a.option_strings
+               if o.startswith("--") and o not in PLAIN]
+    assert missing == []
+
+
+def test_llm_choices_match():
+    choices = next(a.choices for a in build_parser()._actions if "--llm" in a.option_strings)
+    assert "{" + "|".join(choices) + "}" in PLAIN
+
+
+def test_man_version_matches():
+    m = re.search(r'^\.TH \S+ 1 "[^"]*" "stylefix ([^"]+)"', MAN, re.M)
+    assert m and m.group(1) == __version__
+
+
+def test_no_dgx_in_help_or_man():
+    assert "dgx" not in build_parser().format_help().lower()
+    assert "dgx" not in MAN.lower()
+```
+
+Run: `uv run pytest tests/test_docs.py -v`
+Expected: `test_every_long_option_is_in_the_man_page` FAIL listing `--setup`, `--check-endpoint` (and any other option the page never documented); `test_llm_choices_match` and `test_no_dgx_in_help_or_man` FAIL; `test_man_version_matches` FAIL (`0.6.0`).
 
 - [ ] **Step 1: License files**
 
@@ -1131,6 +1843,17 @@ In `## The model`, replace everything from the heading down to (not including) "
 ````markdown
 ## The model
 
+The quickest way to set one up is
+
+```
+stylefix --setup
+```
+
+which asks where your model is (local Ollama, a hosted API, or your own
+server), tests it, and saves the answer where both stylefix and proofix
+find it. `stylefix --check-endpoint` shows what stylefix will use, where
+each setting came from, and whether the endpoint answers.
+
 Any OpenAI-compatible `/v1/chat/completions` endpoint works: Ollama, vLLM,
 LiteLLM, llama.cpp's server, or a hosted API. stylefix takes its settings
 from, highest first: `--url`/`--model`/`--timeout`; `STYLEFIX_LLM_URL`,
@@ -1184,6 +1907,35 @@ with [adjudicate](https://github.com/AndrewBroz/adjudicate).
 Check: `grep -n -i "\.\./\|~/Code\|dgx-llm\|DGX_LLM" README.md` prints nothing.
 
 - [ ] **Step 4: Man page** — in `man/stylefix.1`:
+
+First line: `.TH STYLEFIX 1 "September 2026" "stylefix 0.7.0" "User Commands"`.
+
+After the `.SS Model` section and before `.SS General`, add:
+
+```
+.SS Configuration
+.TP
+.B \-\-setup
+Ask where the model is (local Ollama, a hosted OpenAI-compatible API, or a
+self-hosted server), test it, and save the answer as the
+.B [llm]
+table of
+.I ~/.config/adjudicate/config.toml
+(shared with proofix) or
+.IR ~/.config/stylefix/config.toml .
+An existing table is shown and replaced only on confirmation, after a
+backup to
+.IR config.toml.bak ;
+other tables are kept. For a self-hosted server it detects whether to set
+.BR thinking_switch .
+Needs a terminal. Ends by running the check below.
+.TP
+.B \-\-check\-endpoint
+Print the endpoint stylefix would use, one line per setting with the
+layer it came from (a key is never shown), then list the server's models
+and send one small request. Honours
+.BR \-\-llm ", " \-\-url ", " \-\-model " and " \-\-timeout .
+```
 
 Replace the `.BR \-\-llm " {auto|dgx|ollama|none}"` entry (from that line through the line "(the default) uses the first of dgx, ollama that answers.") with:
 
@@ -1239,12 +1991,35 @@ discards the model, key and thinking_switch of the layers below it.
 
 In `.SH SEE ALSO`: `.BR pandoc (1),` → `.BR pandoc (1).` and delete `.BR dgx (1).`; "Source and README: ~/Code/stylefix." → "Source and README: https://github.com/AndrewBroz/stylefix."
 
-Check: `grep -n -i "dgx\|~/Code" man/stylefix.1` prints nothing, and `man ./man/stylefix.1 | col -b | grep -A3 "\-\-llm"` renders without troff warnings.
+Replace `.SH EXIT STATUS` with:
+
+```
+.SH EXIT STATUS
+.TP
+.B 0
+Finished. Undecided words and review items are reported, not fatal. For
+.BR \-\-check\-endpoint " and " \-\-setup :
+the endpoint answers.
+.TP
+.B 1
+.BR \-\-check\-endpoint " or " \-\-setup :
+no endpoint, or it does not answer; or setup was cancelled or declined.
+.TP
+.B 2
+Input file missing, Vale not found or failed, or an invalid endpoint
+configuration (the message names the file and key). For
+.BR \-\-setup :
+standard input is not a terminal.
+```
+
+If `tests/test_docs.py` still lists options missing from the page, add a `.TP` entry for each in the section matching its help group, worded from its `--help` text.
+
+Check: `uv run pytest tests/test_docs.py -v` passes; `grep -n -i "dgx\|~/Code" man/stylefix.1` prints nothing; `man ./man/stylefix.1 2>&1 >/dev/null` prints no troff warnings.
 
 - [ ] **Step 5: Build and inspect**
 
 Run: `uv run pytest -q && rm -rf dist && uv build --no-sources`
-Expected: 118 passed; sdist and wheel for 0.7.0 built. `--no-sources` resolves `adjudicate>=0.3` from PyPI only at install time, so the build itself succeeds before adjudicate is published.
+Expected: 125 passed; sdist and wheel for 0.7.0 built. `--no-sources` resolves `adjudicate>=0.3` from PyPI only at install time, so the build itself succeeds before adjudicate is published.
 
 Run: `unzip -p dist/stylefix-0.7.0-py3-none-any.whl 'stylefix-0.7.0.dist-info/METADATA' | grep -E "^(License-Expression|Requires-Dist)" && unzip -l dist/stylefix-0.7.0-py3-none-any.whl | grep -c "styles/.*\.yml"`
 Expected: `License-Expression: MIT AND LicenseRef-VarCon`, `Requires-Dist: adjudicate<0.4,>=0.3` and `spylls>=0.1.7`; a non-zero count of style rules (the Vale YAML ships).
@@ -1252,8 +2027,8 @@ Expected: `License-Expression: MIT AND LicenseRef-VarCon`, `Requires-Dist: adjud
 - [ ] **Step 6: Commit**
 
 ```bash
-git add -A LICENSE pyproject.toml stylefix/__init__.py stylefix/dict README.md man/stylefix.1 uv.lock
-git commit -m "MIT license; dictionary notices move to adjudicate; README and man page for any endpoint; v0.7.0"
+git add -A LICENSE pyproject.toml stylefix/__init__.py stylefix/dict README.md man/stylefix.1 uv.lock tests/test_docs.py
+git commit -m "MIT license; dictionary notices move to adjudicate; README and man page for any endpoint, --setup and --check-endpoint; a test keeps the man page in step; v0.7.0"
 ```
 
 ---
@@ -1263,16 +2038,17 @@ git commit -m "MIT license; dictionary notices move to adjudicate; README and ma
 **Files:**
 - Create: `proofix/tests/conftest.py` (the same content as Task 5, Step 1, verbatim)
 - Create: `proofix/tests/test_endpoint_cli.py`
-- Modify: `proofix/pyproject.toml:6`, `proofix/proofix/cli.py` (lines 13, 94, 99, 146), `proofix/proofix/commas.py:96-101`
+- Modify: `proofix/pyproject.toml:6`, `proofix/proofix/cli.py` (`DESCRIPTION`, `EPILOG`, lines 13, 62, 94, 99, the start of `main`, 146), `proofix/proofix/commas.py:96-101`
 
 **Interfaces:**
-- Consumes: `resolve_endpoint`, `ConfigError`, `FENCE`, `FRONT_MATTER`.
+- Consumes: `resolve_endpoint`, `ConfigError`, `FENCE`, `FRONT_MATTER`, `run_setup`, `check_endpoint`.
 
 - [ ] **Step 1: Test isolation** — create `tests/conftest.py` with exactly the content of Task 5, Step 1. Do not run the suite yet: the old positional `resolve_endpoint` call in `proofix/cli.py` fails against adjudicate 0.3 until Step 4.
 
 - [ ] **Step 2: Write the failing tests** — create `tests/test_endpoint_cli.py`:
 
 ```python
+import io
 import os
 
 import pytest
@@ -1306,6 +2082,29 @@ def test_bad_config_exits_2(isolated_llm_config, tmp_path, capsys):
     assert err.startswith("proofix: ") and str(cfg) in err
 
 
+def test_no_endpoint_suggests_setup(tmp_path, capsys):
+    src = tmp_path / "d.md"
+    src.write_text("Some text.\n")
+    assert cli.main([str(src), "--no-lt", "--no-typos", "--no-cache", "--dry-run"]) == 0
+    assert "proofix --setup" in capsys.readouterr().err
+
+
+def test_check_endpoint_needs_no_input_file(capsys):
+    assert cli.main(["--check-endpoint"]) == 1
+    assert "proofix --setup" in capsys.readouterr().out
+
+
+def test_setup_needs_a_terminal(monkeypatch, capsys):
+    monkeypatch.setattr("sys.stdin", io.StringIO(""))
+    assert cli.main(["--setup"]) == 2
+
+
+def test_input_still_required_for_a_run(capsys):
+    with pytest.raises(SystemExit) as e:
+        cli.main([])
+    assert e.value.code == 2 and "input" in capsys.readouterr().err
+
+
 def test_stylefix_env_no_longer_configures_proofix(monkeypatch):
     monkeypatch.setenv("STYLEFIX_LLM_URL", "http://stylefix-only/v1")
     monkeypatch.setenv("STYLEFIX_LLM_MODEL", "m")
@@ -1316,14 +2115,72 @@ def test_stylefix_env_no_longer_configures_proofix(monkeypatch):
 - [ ] **Step 3: Run them to verify they fail**
 
 Run: `uv run pytest tests/test_endpoint_cli.py -v`
-Expected: `test_dgx_preset_is_gone`, `test_timeout_flag_defaults_to_none` and `test_bad_config_exits_2` FAIL; the isolation and STYLEFIX tests PASS (the latter already, because Task 3 changed the library).
+Expected: `test_dgx_preset_is_gone`, `test_timeout_flag_defaults_to_none`, `test_bad_config_exits_2`, `test_no_endpoint_suggests_setup`, `test_check_endpoint_needs_no_input_file` and `test_setup_needs_a_terminal` FAIL; the isolation, required-input and STYLEFIX tests PASS (the last already, because Task 3 changed the library).
 
 - [ ] **Step 4: Implement**
 
 `pyproject.toml`: `dependencies = ["adjudicate>=0.3,<0.4"]`.
 
 `proofix/cli.py`:
-- line 13: `from adjudicate import Cache, ConfigError, Edit, adjudicate, apply_edits, resolve_endpoint, system_prompt`
+- `DESCRIPTION`, tier 2: "a local model picks one or KEEP" → "a language model picks one or KEEP".
+- `EPILOG` becomes:
+
+```
+examples:
+  proofix --setup                        # choose, test and save a model endpoint
+  proofix draft.md                       # -> draft.proofed.md, US English
+  proofix draft.md --target uk -o out.md
+  proofix draft.md --changes             # list every change as it is made
+  proofix draft.md --no-commas --llm none
+      LanguageTool's mechanical fixes only; nothing needs a model
+
+Requires languagetool on PATH for tiers 1 and 2 (brew install languagetool);
+tier 3 needs only a model. Accept lists: --accept, ~/.config/proofix/accept.txt,
+~/.config/stylefix/accept.txt and ./.stylefix/accept.txt are all honoured.
+
+environment:
+  PROOFIX_LLM_URL, PROOFIX_LLM_MODEL, PROOFIX_LLM_KEY
+      the model endpoint for proofix (same as --url, --model, and the API key)
+  ADJUDICATE_LLM_URL, ADJUDICATE_LLM_MODEL, ADJUDICATE_LLM_KEY
+      the same, shared with stylefix; below the proofix variables and config
+  OLLAMA_HOST   Ollama base URL (default http://localhost:11434)
+
+files:
+  ~/.config/proofix/config.toml      [llm] url, model, api_key or api_key_env,
+                                     timeout, thinking_switch (proofix only)
+  ~/.config/adjudicate/config.toml   the same table, shared with stylefix
+```
+
+- line 13: `from adjudicate import Cache, ConfigError, Edit, adjudicate, apply_edits, check_endpoint, resolve_endpoint, run_setup, system_prompt`
+- line 62: `p.add_argument("input", type=Path, nargs="?", help="Markdown file to proofread")`
+- after the `--timeout` argument:
+
+```python
+    c = p.add_argument_group("configuration", "set up or check the model endpoint, then exit")
+    c.add_argument("--setup", action="store_true",
+                   help="choose a model endpoint interactively, test it, and save it to "
+                        "~/.config/adjudicate/config.toml or ~/.config/proofix/config.toml")
+    c.add_argument("--check-endpoint", action="store_true",
+                   help="show the endpoint proofix would use and where each setting comes "
+                        "from, then test it; exit 0 if it answers, 1 if not, 2 on a config error")
+```
+
+- at the top of `main`, replacing `args = build_parser().parse_args(argv)` and the `if not args.input.exists():` check that follows it:
+
+```python
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    if args.setup:
+        return run_setup("proofix")
+    if args.check_endpoint:
+        return check_endpoint("proofix", preset=args.llm, url=args.url, model=args.model,
+                              timeout=args.timeout)
+    if args.input is None:
+        parser.error("the following arguments are required: input")
+    if not args.input.exists():
+```
+
+  (the body of the `exists` check is unchanged).
 - line 94: `p.add_argument("--llm", choices=["auto", "ollama", "none"], default="auto", help="auto: the endpoint from --url, PROOFIX_LLM_*, ~/.config/proofix/config.toml, ADJUDICATE_LLM_* or ~/.config/adjudicate/config.toml, else local Ollama; ollama: local Ollama only; none: report instead of deciding (default: %(default)s)")`
 - line 99: `p.add_argument("--timeout", type=float, default=None, metavar="SEC", help="seconds per model request (default: 120, or timeout in config.toml)")`
 - line 146:
@@ -1335,6 +2192,9 @@ Expected: `test_dgx_preset_is_gone`, `test_timeout_flag_defaults_to_none` and `t
     except ConfigError as e:
         print(f"proofix: {e}", file=sys.stderr)
         return 2
+    if ep is None and args.llm == "auto":
+        print("proofix: no model endpoint found; tiers 2 and 3 will be reported, not applied. "
+              "Run `proofix --setup` to configure one.", file=sys.stderr)
 ```
 
 `proofix/commas.py`: delete the function-local `from adjudicate.context import _FENCE, _FRONT   # noqa` line, add `FENCE, FRONT_MATTER` to the module's `from adjudicate import …` on line 16, and in `_paragraphs` replace `_FRONT` with `FRONT_MATTER` and `_FENCE` with `FENCE`.
@@ -1344,7 +2204,7 @@ Then: `uv lock`.
 - [ ] **Step 5: Run the whole suite**
 
 Run: `uv run pytest -q`
-Expected: 18 passed. If a test that passed before this task fails now, it depended on a live model or real config: report it; do not weaken the fixture. `grep -rn -i "dgx\|_FENCE\|_FRONT" proofix` prints nothing.
+Expected: 22 passed. If a test that passed before this task fails now, it depended on a live model or real config: report it; do not weaken the fixture. `grep -rn -i "dgx\|_FENCE\|_FRONT" proofix` prints nothing.
 
 - [ ] **Step 6: Commit**
 
@@ -1359,7 +2219,47 @@ git commit -m "Endpoint from adjudicate 0.3's config layers; --llm auto|ollama|n
 
 **Files:**
 - Create: `proofix/LICENSE` (the MIT text from Task 4, verbatim)
-- Modify: `proofix/pyproject.toml`, `proofix/proofix/__init__.py:3`, `proofix/README.md`, `proofix/man/proofix.1:104-106`
+- Modify: `proofix/pyproject.toml`, `proofix/proofix/__init__.py:3`, `proofix/README.md`, `proofix/man/proofix.1`
+- Create: `proofix/tests/test_docs.py`
+
+- [ ] **Step 0: The drift test** — create `tests/test_docs.py`; it is Task 6's test with the names changed:
+
+```python
+"""The man page and --help must keep up with the parser."""
+
+import re
+from pathlib import Path
+
+from proofix import __version__
+from proofix.cli import build_parser
+
+MAN = (Path(__file__).parent.parent / "man" / "proofix.1").read_text(encoding="utf-8")
+PLAIN = MAN.replace("\\-", "-")          # roff writes --llm as \-\-llm
+
+
+def test_every_long_option_is_in_the_man_page():
+    missing = [o for a in build_parser()._actions for o in a.option_strings
+               if o.startswith("--") and o not in PLAIN]
+    assert missing == []
+
+
+def test_llm_choices_match():
+    choices = next(a.choices for a in build_parser()._actions if "--llm" in a.option_strings)
+    assert "{" + "|".join(choices) + "}" in PLAIN
+
+
+def test_man_version_matches():
+    m = re.search(r'^\.TH \S+ 1 "[^"]*" "proofix ([^"]+)"', MAN, re.M)
+    assert m and m.group(1) == __version__
+
+
+def test_no_dgx_in_help_or_man():
+    assert "dgx" not in build_parser().format_help().lower()
+    assert "dgx" not in MAN.lower()
+```
+
+Run: `uv run pytest tests/test_docs.py -v`
+Expected: all four FAIL; the first lists at least `--setup`, `--check-endpoint`, `--version` and `--help`.
 
 - [ ] **Step 1: License and metadata**
 
@@ -1421,7 +2321,9 @@ Optional, and worth having:
 - [typos](https://github.com/crate-ci/typos) (`brew install typos-cli` or
   `cargo install typos-cli`) for known-misspelling fixes in tier 1.
 
-The model endpoint is configured as for stylefix: `--url`/`--model`,
+Run `proofix --setup` to choose and test a model endpoint, and
+`proofix --check-endpoint` to see which one proofix will use. The endpoint
+is configured as for stylefix: `--url`/`--model`,
 `PROOFIX_LLM_URL`/`_MODEL`/`_KEY`, `~/.config/proofix/config.toml`, then
 the shared `ADJUDICATE_LLM_*` and `~/.config/adjudicate/config.toml`; with
 nothing configured, a local Ollama if one is running. See
@@ -1444,7 +2346,15 @@ MIT (see `LICENSE`).
 
 Check: `grep -n -i "\.\./\|~/Code\|mdmemo" README.md` prints nothing.
 
-- [ ] **Step 3: Man page** — the `--llm` entry becomes:
+- [ ] **Step 3: Man page** — first line: `.TH PROOFIX 1 "September 2026" "proofix 0.5.0" "User Commands"`. In SYNOPSIS, add a second form below the existing one:
+
+```
+.br
+.B proofix
+.RB [ \-\-setup " | " \-\-check\-endpoint ]
+```
+
+The `--llm` entry becomes:
 
 ```
 .BR \-\-llm " {auto|ollama|none}" ", " \-\-url ", " \-\-model ", " \-\-timeout
@@ -1455,58 +2365,132 @@ then the shared
 With none, tiers two and three are reported, not applied.
 ```
 
+After the `--llm` entry's following entries (at the end of `.SH OPTIONS`, before `.SH PERFORMANCE`), add:
+
+```
+.TP
+.B \-\-setup
+Ask where the model is (local Ollama, a hosted OpenAI-compatible API, or a
+self-hosted server), test it, and save the answer as the
+.B [llm]
+table of
+.I ~/.config/adjudicate/config.toml
+(shared with stylefix) or
+.IR ~/.config/proofix/config.toml .
+An existing table is shown and replaced only on confirmation, after a
+backup to
+.IR config.toml.bak .
+Needs a terminal. Ends by running the check below.
+.TP
+.B \-\-check\-endpoint
+Print the endpoint proofix would use, one line per setting with the layer
+it came from (a key is never shown), then list the server's models and
+send one small request.
+.TP
+.BR \-v ", " \-\-verbose
+Report model batches on standard error.
+.TP
+.B \-\-version
+Print the version and exit.
+.TP
+.BR \-h ", " \-\-help
+Print the usage summary and exit.
+```
+
+(Drop any of the last three if the page already has them; the drift test is the judge.) Before `.SH SEE ALSO`, add:
+
+```
+.SH ENVIRONMENT
+.TP
+.BR PROOFIX_LLM_URL ", " PROOFIX_LLM_MODEL ", " PROOFIX_LLM_KEY
+Endpoint, model and API key for proofix; below the flags, above the config
+files.
+.TP
+.BR ADJUDICATE_LLM_URL ", " ADJUDICATE_LLM_MODEL ", " ADJUDICATE_LLM_KEY
+The same, shared with stylefix; below
+.I ~/.config/proofix/config.toml
+and above
+.IR ~/.config/adjudicate/config.toml .
+.TP
+.B OLLAMA_HOST
+Ollama base URL. Default http://localhost:11434.
+.SH FILES
+.TP
+.I ~/.config/proofix/config.toml
+.TQ
+.I ~/.config/adjudicate/config.toml
+Table
+.B [llm]
+with keys
+.BR url ", " model ", " api_key " or " api_key_env ", " timeout ", " thinking_switch .
+The first applies to proofix only; the second is shared with stylefix.
+.TP
+.IR ~/.config/proofix/accept.txt ", " ~/.config/stylefix/accept.txt ", " .stylefix/accept.txt ", " .proofix/accept.txt
+Words never flagged as misspelled, one per line.
+.SH EXIT STATUS
+.TP
+.B 0
+Finished. For
+.BR \-\-check\-endpoint " and " \-\-setup :
+the endpoint answers.
+.TP
+.B 1
+.BR \-\-check\-endpoint " or " \-\-setup :
+no endpoint, or it does not answer; or setup was cancelled or declined.
+.TP
+.B 2
+Input file missing, LanguageTool failed, or an invalid endpoint
+configuration (the message names the file and key). For
+.BR \-\-setup :
+standard input is not a terminal.
+```
+
 In `.SH SEE ALSO`, delete the `.BR mdmemo (1),` line.
+
+Check: `uv run pytest tests/test_docs.py -v` passes; `man ./man/proofix.1 2>&1 >/dev/null` prints no troff warnings.
 
 - [ ] **Step 4: Build and inspect**
 
 Run: `uv run pytest -q && rm -rf dist && uv build --no-sources && unzip -p dist/proofix-0.5.0-py3-none-any.whl 'proofix-0.5.0.dist-info/METADATA' | grep -E "^(License-Expression|Requires-Dist)"`
-Expected: 18 passed; `License-Expression: MIT`, `Requires-Dist: adjudicate<0.4,>=0.3`.
+Expected: 26 passed; `License-Expression: MIT`, `Requires-Dist: adjudicate<0.4,>=0.3`.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add LICENSE pyproject.toml proofix/__init__.py README.md man/proofix.1 uv.lock
-git commit -m "MIT license, PyPI metadata, README and man page for any endpoint; v0.5.0"
+git add LICENSE pyproject.toml proofix/__init__.py README.md man/proofix.1 uv.lock tests/test_docs.py
+git commit -m "MIT license, PyPI metadata; README and man page for any endpoint, --setup and --check-endpoint; a test keeps the man page in step; v0.5.0"
 ```
 
 ---
 
-### Task 9: The author's own config, and a live check
+### Task 9: The author's own config through `--setup`, and a live check
 
-Keeps the dgx gateway working after the preset is gone. Needs the author at the keyboard.
+Keeps the dgx gateway working after the preset is gone, and is the setup flow's real-world test. Needs the author at the keyboard: the implementer prepares, the author types.
 
 **Files:**
-- Create: `~/.config/adjudicate/config.toml` (outside every repo; not committed)
+- Create (through setup): `~/.config/adjudicate/config.toml` (outside every repo; not committed)
 
-- [ ] **Step 1: Read the gateway settings** — from `~/Code/dgx-llm/.env` take `DGX_HTTP_HOST` and `PRIMARY_MODEL_ALIAS` (do not print `LITELLM_MASTER_KEY`):
+- [ ] **Step 1: Read the gateway address** — from `~/Code/dgx-llm/.env` take `DGX_HTTP_HOST` and `PRIMARY_MODEL_ALIAS` (do not print `LITELLM_MASTER_KEY`):
 
 ```bash
 grep -E "^(DGX_HTTP_HOST|PRIMARY_MODEL_ALIAS)=" ~/Code/dgx-llm/.env
 ```
 
-- [ ] **Step 2: Ask the author how the key should be held** — either (a) `api_key_env = "LITELLM_MASTER_KEY"` and they add `export LITELLM_MASTER_KEY=…` to their shell profile themselves, or (b) `api_key = "…"` in the file with `chmod 600`. Do not choose for them.
+- [ ] **Step 2: Ask the author how the key should be held** — (a) from an environment variable (setup's recommended choice): they add `export LITELLM_MASTER_KEY=…` to their shell profile and open a new shell first; or (b) pasted into setup, stored in the file with mode 0600. Do not choose for them.
 
-- [ ] **Step 3: Write the file** (shown for option a; substitute the two values from Step 1):
+- [ ] **Step 3: The author runs setup** — suggest they type, in this session, `! cd ~/Code/stylefix && uv run stylefix --setup` and answer: **3** (self-hosted), `http://<DGX_HTTP_HOST>:4000/v1`, the key choice from Step 2, the model matching `PRIMARY_MODEL_ALIAS`, **1** (shared file).
 
-```toml
-# dgx-llm LiteLLM gateway, formerly stylefix's built-in "dgx" preset
-[llm]
-url = "http://<DGX_HTTP_HOST>:4000/v1"
-model = "<PRIMARY_MODEL_ALIAS>"
-api_key_env = "LITELLM_MASTER_KEY"
-thinking_switch = true
-```
+Expected: "server accepts enable_thinking → thinking_switch = true", "Wrote ~/.config/adjudicate/config.toml", and a check ending `chat ✓`. If `thinking_switch` comes out false, or any step reads badly, that is a finding for the setup flow: note it for the author and fix it in adjudicate before Task 11, with a test.
 
-- [ ] **Step 4: Live check, both tools** — in a scratch directory:
+- [ ] **Step 4: Live check, both tools**
 
 ```bash
+(cd ~/Code/proofix && uv run proofix --check-endpoint)
 (cd ~/Code/stylefix && uv run stylefix examples/sample.md --target uk --dry-run --no-cache -v 2>&1 | tail -5)
 (cd ~/Code/proofix && uv run proofix examples/typos.md --dry-run --no-cache -v 2>&1 | tail -5)
 ```
 
-`--dry-run` writes nothing, so running against the repos' own examples is safe.
-
-Expected: both summaries report adjudicated items with `0 undecided` or a small number, and `-v` shows batches going to the gateway URL. If either reports `cannot reach`, stop and show the author the message.
+Expected: proofix's check shows every row sourced from `~/.config/adjudicate/config.toml` and exits 0; both runs report adjudicated items with few or no undecided, and `-v` shows batches going to the gateway. `--dry-run` writes nothing, so the repos' own examples are safe to use. If either reports `cannot reach`, stop and show the author the message.
 
 ---
 
