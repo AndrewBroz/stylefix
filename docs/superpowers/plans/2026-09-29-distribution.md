@@ -2520,10 +2520,13 @@ Order matters: each package must resolve its dependency from an index. The autho
 
 ```bash
 cd ~/Code/adjudicate && rm -rf dist && uv build --no-sources
+tar tzf dist/*.tar.gz | grep -E '\.superpowers|docs/|\.venv|/dist/' && echo "STOP: private files in the sdist" || echo "sdist clean"
 uv publish --publish-url https://test.pypi.org/legacy/ dist/*
 ```
 
-- [ ] **Step 2: stylefix and proofix to TestPyPI** — the same two commands in each repo, stylefix first.
+Never upload an sdist whose listing has not been read: PyPI files can never be replaced. (The first stylefix build shipped `.superpowers/` and `docs/superpowers/`; each pyproject now uses `only-include`.)
+
+- [ ] **Step 2: stylefix and proofix to TestPyPI** — the same three commands (build, sdist check, publish) in each repo, stylefix first.
 
 - [ ] **Step 3: Clean install from TestPyPI** — in a scratch directory, with no `~/Code` on any path:
 
