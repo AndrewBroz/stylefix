@@ -155,3 +155,15 @@ def test_numerals_in_dates_are_not_flagged(text):
 def test_numerals_elsewhere_still_flagged():
     r = api.fix("We hired 3 people.\n", api.Options(target="uk", style="oxford"), None, Cache(None))
     assert [a for a in r.review_alerts if a.check.endswith("Numbers")]
+
+
+@pytest.mark.parametrize("text", ["These 3 may be wrong.\n", "Only 3 may attend.\n", "I will march 4 miles.\n"])
+def test_lower_case_may_and_march_are_not_months(text):
+    r = api.fix(text, api.Options(target="uk", style="oxford"), None, Cache(None))
+    assert [a for a in r.review_alerts if a.check.endswith("Numbers")]
+
+
+@pytest.mark.parametrize("text", ["It was on 3 May.\n", "Due May 3 at noon.\n"])
+def test_capitalised_may_is_a_month(text):
+    r = api.fix(text, api.Options(target="uk", style="oxford"), None, Cache(None))
+    assert not [a for a in r.review_alerts if a.check.endswith("Numbers")]

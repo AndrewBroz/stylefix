@@ -74,10 +74,11 @@ def detect_variety(text: str, accept: Iterable[str] = ()) -> Detection:
     return Detection(None, uk, us)
 
 
-_MONTH = (r"(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?"
-          r"|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?")
-_DATE_BEFORE = re.compile(rf"\b{_MONTH}\s*$", re.I)
-_DATE_AFTER = re.compile(rf"^\s*(?:(?:st|nd|rd|th)\b\s*)?(?:of\s+)?{_MONTH}\b", re.I)
+_MONTH = (r"(?:J(?i:an(?:uary)?)|F(?i:eb(?:ruary)?)|M(?i:ar(?:ch)?)|A(?i:pr(?:il)?)|M(?i:ay)|J(?i:une?)"
+          r"|J(?i:uly?)|A(?i:ug(?:ust)?)|S(?i:ep(?:t(?:ember)?)?)|O(?i:ct(?:ober)?)|N(?i:ov(?:ember)?)"
+          r"|D(?i:ec(?:ember)?))\.?")  # a month name starts with a capital: "may" and "march" are verbs
+_DATE_BEFORE = re.compile(rf"\b{_MONTH}\s*$")
+_DATE_AFTER = re.compile(rf"^\s*(?:(?i:(?:st|nd|rd|th)\b)\s*)?(?:(?i:of)\s+)?{_MONTH}\b")
 _DATE_SHAPE = re.compile(r"\d{1,4}[/.-]\d{1,2}[/.-]\d{1,4}|\d+(?:st|nd|rd|th)\b")
 
 
