@@ -2,7 +2,7 @@
 
 A walkthrough of a new user's first runs (2026-10-12: `uv tool install
 prosefix`, then `prosefix draft.md` on a short British draft) found six
-problems. This design fixes all six in one release: prosefix 0.2.0, with
+problems. This design fixes all six, plus an audit of every edit applied without the model (section 7), in one release: prosefix 0.2.0, with
 stylefix 0.8.1, proofix 0.7.0 and, only if needed, adjudicate 0.3.2.
 
 ## The walkthrough, briefly
@@ -193,6 +193,39 @@ always stopped at exit, including on Ctrl-C and errors.
   `tip: prosefix --diff <path> shows changes without writing them`. Nothing
   is written to remember the tip; it stops appearing once a cache exists.
   `-q` suppresses it.
+
+## 7. Audit of edits applied outright (proofix 0.7.0)
+
+Every source that applies edits without the model is checked against the
+three routes: it stays deterministic only if its edit is right in every
+prose context; otherwise its matches become adjudication items (model
+available) or review items (no model). Sources:
+
+- proofix `tiers.DETERMINISTIC` (LanguageTool rules applied outright):
+  `COMMA_PARENTHESIS_WHITESPACE`, `SENTENCE_WHITESPACE`, `DOUBLE_PUNCTUATION`,
+  `UNLIKELY_OPENING_PUNCTUATION`, `WHITESPACE_RULE` (`ENGLISH_WORD_REPEAT_RULE`
+  leaves the list, per "Doubled words"). Known risks to test for each:
+  `DOUBLE_PUNCTUATION` on `?!`, `!!`, `...` and `..` in paths; whitespace rules
+  on alignment, Markdown line-break double spaces, and table cells;
+  `UNLIKELY_OPENING_PUNCTUATION` on a sentence that legitimately opens with
+  punctuation (`...and then`, `—`, `(`).
+- the `typos` pre-pass: its corrections are dictionary-based and can hit
+  names, identifiers outside code spans, and non-English words. Its edits are
+  deterministic only when the original is all lower-case, not accept-listed,
+  and not within a word containing a digit or underscore; otherwise they
+  become spelling adjudication items (`SPELLING_RULE`) or review items.
+- proofix `mechanical_edits` and `hygiene` (invisible characters, entities,
+  line endings): confirm each is always right; hygiene's decisions are
+  already conservative (entities that change Markdown parsing or carry meaning
+  are left alone).
+- stylefix deterministic swaps (Vale `action: replace` rules and pattern
+  families): out of scope for change here — their table entries are
+  single-answer by construction and ambiguous words are already adjudicated
+  — but the audit notes any entry found during testing that is not.
+
+The outcome of each rule is recorded beside it in the code (a one-line
+reason it is safe, or the move to adjudication), and each moved or kept
+rule gets a test with the risky input.
 
 ## Testing
 
