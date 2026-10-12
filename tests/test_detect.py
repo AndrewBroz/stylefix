@@ -7,7 +7,7 @@ def test_british_note():
 
 
 def test_american_note():
-    d = detect_variety("The color scheme and the program are finalized. Check the license.\n")
+    d = detect_variety("The color scheme and the behavior at the center are organized.\n")
     assert d.target == "us" and d.us >= 2
 
 
@@ -30,3 +30,19 @@ def test_quotes_code_and_repeats_dont_count():
 def test_capitalised_and_accepted_words_dont_count():
     assert detect_variety("Colour Corp and Honour Ltd.\n").target is None
     assert detect_variety("colour honour\n", accept=["colour", "honour"]).target is None
+
+
+def test_shared_words_are_not_evidence():
+    d = detect_variety("Good practice: check the draft story before the programme review. "
+                       "We licence the software and the neighbour's colour is grey.\n")
+    assert d.target == "uk"
+    d = detect_variety("I practise the guitar. Check the story, the draft, and the program. "
+                       "The programme colours were organised.\n")
+    assert d.target == "uk"
+    d = detect_variety("Install the program and write to the disk. Practice the license steps. "
+                       "Check the program log, the analog output, the catalog, and the cheque.\n")
+    assert d.target != "us"
+
+
+def test_indented_code_block_doesnt_count():
+    assert detect_variety("Intro.\n\n    colour honour\n\nEnd.\n").uk == 0

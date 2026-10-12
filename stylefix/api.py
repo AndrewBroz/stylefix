@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import functools
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 
 from adjudicate import prose_regions, protected_spans, Annotation, Change, ReviewItem, Skipped, derive_changes
@@ -30,25 +31,35 @@ class Detection:
 _DETECT_WORD = re.compile(r"[a-z]+(?:[’'][a-z]+)?")
 
 
+# Everyday or technical spellings in both varieties, whatever VarCon says.
+_NOT_EVIDENCE = frozenset({"artifact", "catalog"})
+
+
 @functools.lru_cache(maxsize=1)
 def _variety_words() -> tuple[frozenset[str], frozenset[str]]:
-    """Spellings VarCon gives to one variety and not the other."""
-    uk, us = set(), set()
+    """Spellings one variety accepts in every sense and the other in none."""
+    b_all, a_all = set(), set()
     for c in varcon.clusters():
-        b, a = c.accepted("B"), c.accepted("A")
-        uk |= b - a
-        us |= a - b
-    return frozenset(uk), frozenset(us)
+        b_all |= c.accepted("B")
+        a_all |= c.accepted("A")
+    return (frozenset(b_all - a_all - _NOT_EVIDENCE),
+            frozenset(a_all - b_all - _NOT_EVIDENCE))
 
 
-def detect_variety(text: str, accept=()) -> Detection:
+_INDENTED = re.compile(r"(?:(?<=\n\n)|\A)(?:(?: {4,}|\t)[^\n]*(?:\n|\Z))+")
+
+
+def detect_variety(text: str, accept: Iterable[str] = ()) -> Detection:
     """Which variety a text is written in, from words only one variety uses."""
     uk_words, us_words = _variety_words()
     skip = {w.lower() for w in accept}
     seen_uk, seen_us = set(), set()
+    code = [m.span() for m in _INDENTED.finditer(text)]
     for s, e in prose_regions(text):
         for m in _DETECT_WORD.finditer(text, s, e):
             w = m.group(0)
+            if any(cs <= m.start() < ce for cs, ce in code):
+                continue
             if w in skip or inside_quotes(text, m.start()):
                 continue
             if w in uk_words:
