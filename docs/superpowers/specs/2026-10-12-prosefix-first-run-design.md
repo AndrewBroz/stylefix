@@ -14,6 +14,22 @@ stylefix 0.8.1, proofix 0.7.0 and, only if needed, adjudicate 0.3.2.
 | `--target uk` | correct result; "6 for review", visible only with `--report` |
 | review items | useful, plus noise: "3 September" flagged as a numeral to spell out; LanguageTool suggesting -ize after stylefix chose -ise |
 
+## The rule every tier follows
+
+The aim is a fixer that saves a person time and makes clear what still
+needs them. Every candidate edit takes exactly one of three routes:
+
+1. **Deterministic** — one right answer, applied outright (a known typo, a
+   comma space, `the the`).
+2. **Adjudicated** — judgement needed: the edit becomes an item with its
+   sentence and a closed set of choices (always including KEEP) for the
+   model; applied only above the confidence threshold.
+3. **Review** — genuine uncertainty: the model is unsure, or unavailable, or
+   there is no candidate fix; listed for the person, with the reason.
+
+Anything not provably safe to apply outright goes to route 2 when a model is
+available and route 3 when it is not. Nothing uncertain is applied silently.
+
 ## Goals
 
 1. A note with no configured variety is regularised to the variety it is
@@ -82,12 +98,7 @@ proofix gains a tier `basics` (pure Python, no external tools), which runs
 only when LanguageTool will not run for tier `mechanical` (missing, or
 `mechanical` skipped while `basics` is not):
 
-- doubled word: the same word twice in a row, case-insensitive, separated by
-  a single space or by a newline within the same paragraph (`the the` → `the`;
-  never across a blank line or into a line starting with a list, quote,
-  heading or table marker), except an accept-listed
-  phrase and the known legitimate doubles `that that`, `had had`, `is is`
-  (kept);
+- doubled word (see "Doubled words" below for the routing);
 - space before `,` `.` `;` `:` `!` `?` removed (`programme ,` → `programme,`),
   except before `...` and in protected spans;
 - missing space after `,` `;` `:` added between two letters (`analysis,design`
@@ -96,6 +107,31 @@ only when LanguageTool will not run for tier `mechanical` (missing, or
 
 All three skip protected spans and code. `basics` is a proofix tier name
 (`PROOF_TIERS` gains it) and can be skipped like any other.
+
+### Doubled words
+
+A doubled word is the same word twice in a row, case-insensitive, separated
+by a single space or by a newline within the same paragraph — never across a
+blank line or into a line starting with a list, quote, heading or table
+marker. Some doubles are grammatical ("How do you know that that is wrong?",
+"What it is is unclear", "I had had enough"), emphatic ("very very") or names
+("Bora Bora"), so no list of exceptions can be complete. Routing, applied
+identically to doubles found by `basics` and to LanguageTool's
+`ENGLISH_WORD_REPEAT_RULE` (which leaves proofix's always-apply list):
+
+- **Deterministic**: the word is in a closed list whose doubling is never
+  grammatical — articles (`a`, `an`, `the`), prepositions (`of`, `to`, `in`,
+  `on`, `at`, `for`, `with`, `from`, `by`, `into`, `onto`, `about`), and
+  `and`, `or`, `but`, `nor`, `it`, `we`, `they`, `my`, `your`, `our`, `their`.
+  One copy is removed.
+- **Adjudicated** (model available): any other doubled word becomes an item
+  with the sentence as context, options `[<word>]` (one copy) and `KEEP`,
+  and a rule telling the model that repeats like "that that" and "had had"
+  are often correct.
+- **Review** (no model, or below the confidence threshold):
+  `review — repeated word 'that that'`.
+- **Untouched**: capitalised doubles (likely names), accept-listed phrases,
+  and doubles separated by punctuation (`New York, New York`).
 
 prosefix's skipped-capability lines become at most two:
 
@@ -164,7 +200,12 @@ always stopped at exit, including on Ctrl-C and errors.
   texts; threshold edges (2 vs 1, 2 vs 2); numerals in dates not flagged;
   `|--|` tables and `- --` / `> --` lines untouched.
 - proofix: each `basics` rule and its exceptions (`1,000`, `10:30`, URLs,
-  `that that`, protected spans), running only without LanguageTool;
+  protected spans), running only without LanguageTool; doubled-word routing:
+  `the the`/`of of` fixed; `that that`, `had had`, `is is`, `very very`
+  adjudicated with a fake endpoint (KEEP honoured, a remove decision applied)
+  and listed for review without one; `Bora Bora` and `New York, New York`
+  untouched; a doubled word across two list items untouched; the same routing
+  for a replayed LanguageTool `ENGLISH_WORD_REPEAT_RULE` match;
   `LanguageToolServer` start/stop (skipped if `languagetool-server` is
   missing) and that a server run gives the same matches as the command line
   on the e2e fixture; the rule filter for UK/US.
@@ -197,9 +238,10 @@ resources). Same release checks as before: suites, `uv build --no-sources`,
 - **Detection guesses wrong** on a short note with few marker words: the
   2-word, 2:1 threshold falls back to US and says so; a project `target` or
   `lang:` overrides detection entirely.
-- **`basics` false positives** (a deliberate repetition, a ratio like
-  `3:2`): exceptions are tested; the tier can be skipped; it never runs when
-  LanguageTool runs.
+- **`basics` false positives** (a ratio like `3:2`): exceptions are tested;
+  the tier can be skipped; it never runs when LanguageTool runs. Deliberate
+  repetitions are not a risk of silent damage: outside the closed list they
+  are adjudicated or reviewed, never applied outright.
 - **Server lifecycle**: an orphaned Java process if prosefix is killed with
   SIGKILL. Mitigated by binding to localhost on a random port and starting
   it in its own process group; ordinary exits and Ctrl-C stop it.
