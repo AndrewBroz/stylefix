@@ -43,3 +43,10 @@ def test_cli_still_writes_the_same_file(tmp_path):
     accept = load_accept_lists(None, False)                 # what the CLI uses
     assert out.read_text() == api.fix(SAMPLE, api.Options(target="us", accept=accept),
                                       None, Cache(None)).text
+
+
+def test_no_model_fallbacks_are_labelled_rule():
+    r = api.fix(SAMPLE, api.Options(target="us"), None, Cache(None))
+    assert not any(c.decided_by == "model" for c in r.changes)
+    centre = [c for c in r.changes if c.before.lower() == "centre"]
+    assert centre and all(c.decided_by == "rule" for c in centre)

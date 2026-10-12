@@ -146,7 +146,8 @@ class Result:
     unasked: int
 
 
-def _annotations(applied: list[Edit], decisions: list[Decision]) -> list[Annotation]:
+def _annotations(applied: list[Edit], decisions: list[Decision],
+                 model_used: bool) -> list[Annotation]:
     by_edit = {}
     for d in decisions:
         if d.replacement:
@@ -156,10 +157,11 @@ def _annotations(applied: list[Edit], decisions: list[Decision]) -> list[Annotat
         d = by_edit.get((e.original, e.replacement)) if e.source == "adjudicated" else None
         if d is not None:
             out.append(Annotation(e.original, e.replacement, d.item.source or "adjudicated",
-                                  d.reason, "cache" if d.cached else "model", d.confidence))
+                                  d.reason, "cache" if d.cached else ("model" if model_used else "rule"),
+                                  d.confidence))
         else:
             out.append(Annotation(e.original, e.replacement, e.source,
-                                  decided_by="model" if e.source == "adjudicated" else "rule"))
+                                  decided_by="model" if model_used and e.source == "adjudicated" else "rule"))
     return out
 
 
@@ -240,7 +242,7 @@ def fix(text: str, options: Options, endpoint: Endpoint | None, cache: Cache) ->
     review_items = [ReviewItem(a.line, "alert", a.message, a.check, "stylefix") for a in review]
     review_items += [ReviewItem(d.item.line, "undecided", f"'{d.item.word}': {d.reason}",
                                 d.item.source, "stylefix") for d in decisions if d.choice is None]
-    changes = derive_changes(text, new_text, _annotations(applied, decisions), "punctuation")
+    changes = derive_changes(text, new_text, _annotations(applied, decisions, ep is not None), "punctuation")
     for c in changes:
         c.pass_ = "stylefix"
     return Result(new_text, changes, review_items, skipped, guide, applied, rejected,
