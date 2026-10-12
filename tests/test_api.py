@@ -126,3 +126,18 @@ def test_nothing_inside_obsidian_constructs_is_touched():
         assert piece in r.text, piece
     assert "about the color." in r.text
     assert not any("colour" in (i.message or "") and i.line == 2 for i in r.review)
+
+
+def test_second_run_still_sees_quotes_after_curled_apostrophes():
+    text = "As the Defence Ministry's report put it, \"the colour scheme was unauthorised\".\n"
+    opts = api.Options(target="us", style="chicago")
+    once = api.fix(text, opts, None, Cache(None)).text
+    assert "Ministry’s" in once and "colour scheme was unauthorised" in once
+    assert api.fix(once, opts, None, Cache(None)).text == once
+
+
+def test_front_matter_after_a_byte_order_mark_is_left_alone():
+    head = "\ufeff---\ntitle: \"Colour programme\" -- draft\ntags: [colour]\n---\n"
+    r = api.fix(head + "\nThe colour programme -- ok.\n", api.Options(target="us", style="chicago"),
+                None, Cache(None))
+    assert r.text == head + "\nThe color program—ok.\n"

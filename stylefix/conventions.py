@@ -135,22 +135,32 @@ def set_primary_quotes(s: str, primary: str, stats: Stats, move_punct: bool) -> 
 
 # --- dashes, ranges, dates --------------------------------------------------
 
-# A parenthetical dash: "--", an em dash, or a spaced en dash, with any
-# surrounding blanks (a single newline counts, so a dash at a line end is
-# handled without crossing a paragraph break). Digit-hugged en dashes are
-# ranges and are left alone; "---" is a rule or front-matter fence.
-_DASH = re.compile(r"(?<![-\d–])(?:[ \t]|\n(?!\n))*(?:(?<!-)--(?!-)|—|(?<=\s)–(?=\s))(?:[ \t]|\n(?!\n))*(?![-\d–])")
+# A parenthetical dash: "--", an em dash, or a spaced en dash, with the
+# blanks around it on its own line. A newline is never consumed: a dash at a
+# line end or start is normalised in place and both lines stay, because the
+# next line may be a callout, a fence, a heading or a table row. Digit-hugged
+# en dashes are ranges and are left alone; "---" is a rule or front-matter fence.
+_DASH = re.compile(r"(?<![-\d–])([ \t]*)(?:(?<!-)--(?!-)|—|(?<=\s)–(?=\s))([ \t]*)(?![-\d–])")
 
 
 def parenthetical_dashes(s: str, style: str, stats: Stats) -> str:
-    """style: 'em' unspaced em dash; 'em-spaced' spaced em dash; 'en-spaced'."""
+    """style: 'em' unspaced em dash; 'em-spaced' spaced em dash; 'en-spaced'.
+    The guide's spacing applies within the line: at a line start the
+    indentation is kept and no space is added before the dash; at a line end
+    no space is left after it."""
     want = {"em": "—", "em-spaced": " — ", "en-spaced": " – "}[style]
 
     def rep(m):
-        if m.group(0) == want:
-            return want
-        stats.dashes += 1
-        return want
+        out = want
+        lead = ""
+        if m.start() == 0 or s[m.start() - 1] == "\n":
+            lead, out = m.group(1), out.lstrip()
+        if m.end() == len(s) or s[m.end()] == "\n":
+            out = out.rstrip()
+        out = lead + out
+        if m.group(0) != out:
+            stats.dashes += 1
+        return out
     return _DASH.sub(rep, s)
 
 

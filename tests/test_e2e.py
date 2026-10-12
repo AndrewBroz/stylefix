@@ -77,7 +77,8 @@ def test_to_us_chicago(tmp_path, stub_url):
     assert "organizes its work around a simple license" in text
     assert "Members practice what they preach: every program is analyzed" in text
     assert "story of the building is cataloged" in text and "is spelt the British way" in text
-    assert "“color” is spelt the British way—while our American colleagues favor “color.”" in text
+    # the line-end dash keeps its line break (C2: a dash never joins two lines)
+    assert "“color” is spelt the British way—\nwhile our American colleagues favor “color.”" in text
     assert "runs 3–5 sessions" in text
     assert "The license fee is ten pounds" in text          # Chicago numeral, via the stub
     assert "Labour Party office by September 4, 2026" in text          # KEEP via stub
@@ -95,7 +96,7 @@ def test_to_uk_oxford(tmp_path, stub_url):
     text, rep = run(tmp_path, "uk", ["--url", stub_url, "--model", "stub"])
     assert "The programme crashed after the cheque cleared, and the story about the storey" in text
     assert "made us tire of the whole thing" in text
-    assert "‘colour’ is spelt the British way – whilst our American colleagues favour ‘color’." in text  # quoted: stub keeps
+    assert "‘colour’ is spelt the British way –\nwhilst our American colleagues favour ‘color’." in text  # quoted: stub keeps
     assert "by 4 September 2026" in text
     assert "## Adjudicated" in rep
 

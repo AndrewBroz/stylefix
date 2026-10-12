@@ -16,7 +16,7 @@ from .context import at_sentence_start, inside_quotes, sentence_context
 from .conventions import Stats, normalize
 from .vale_runner import Alert, ValeNotFound, run_vale_text
 
-FRONT_MATTER = re.compile(r"\A---\n.*?\n---\n", re.S)
+FRONT_MATTER = re.compile(r"\A\ufeff?---\n.*?\n---\n", re.S)  # an optional byte-order mark first
 
 
 def partition(text: str, alerts: list[Alert], target: str, guide: str,

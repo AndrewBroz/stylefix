@@ -1,3 +1,5 @@
+import pytest
+
 from stylefix.conventions import normalize, prose_regions
 
 
@@ -44,10 +46,31 @@ def test_already_curly_double_to_uk_single():
 def test_dashes_chicago_and_oxford():
     src = "one -- two—three – four, pages 5–6, x --\nnext, and a\n\n---\n\nrule 2020-21.\n"
     us, st = normalize(src, "us", "chicago")
-    assert us == "one—two—three—four, pages 5–6, x—next, and a\n\n---\n\nrule 2020–21.\n"
+    # A line-end dash is normalised in place; the line break stays (it used to
+    # join "x—next", which broke callouts, fences and headings on the next line).
+    assert us == "one—two—three—four, pages 5–6, x—\nnext, and a\n\n---\n\nrule 2020–21.\n"
     assert st.dashes == 3
     uk, _ = normalize("one -- two—three – four --\nnext\n", "uk", "oxford")
-    assert uk == "one – two – three – four – next\n"
+    assert uk == "one – two – three – four –\nnext\n"
+
+
+@pytest.mark.parametrize("src, us, uk", [
+    ("> He paused —\n> then spoke.\n", "> He paused—\n> then spoke.\n", "> He paused –\n> then spoke.\n"),
+    ("> [!note] Aside --\n> body\n", "> [!note] Aside—\n> body\n", "> [!note] Aside –\n> body\n"),
+    ("Intro —\n```\ncode -- here\n```\n", "Intro—\n```\ncode -- here\n```\n", "Intro –\n```\ncode -- here\n```\n"),
+    ("Text --\n# Heading\n", "Text—\n# Heading\n", "Text –\n# Heading\n"),
+    ("Sum —\n$$\nx -- y\n$$\n", "Sum—\n$$\nx -- y\n$$\n", "Sum –\n$$\nx -- y\n$$\n"),
+    ("Note --  \n%% aside -- %%\n", "Note—\n%% aside -- %%\n", "Note –\n%% aside -- %%\n"),
+    ("- first item —\n- second -- item\n", "- first item—\n- second—item\n", "- first item –\n- second – item\n"),
+    ("Table --\n| a -- b | c |\n|---|---|\n", "Table—\n| a—b | c |\n|---|---|\n",
+     "Table –\n| a – b | c |\n|---|---|\n"),
+    ("Pipe —\n|\n", "Pipe—\n|\n", "Pipe –\n|\n"),
+    ("He paused\n— then spoke.\n", "He paused\n—then spoke.\n", "He paused\n– then spoke.\n"),
+    ("    -- indented start\n", "    —indented start\n", "    – indented start\n"),
+])
+def test_dash_never_joins_lines(src, us, uk):
+    assert normalize(src, "us", "chicago")[0] == us
+    assert normalize(src, "uk", "oxford")[0] == uk
 
 
 def test_html_comments_and_tags_are_protected():
@@ -76,9 +99,6 @@ def test_uk_single_primary_across_a_construct():
 def test_dash_beside_protected_quotes():
     out, _ = normalize('Read "#draft" and "$x$" -- now.\n', "us", "chicago")
     assert out == "Read “#draft” and “$x$”—now.\n"
-
-
-import pytest
 
 
 def _xfail(text, us, uk, reason):
