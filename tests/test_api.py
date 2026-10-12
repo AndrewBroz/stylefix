@@ -85,3 +85,33 @@ def test_replay_cache_answers_from_cache(tmp_path):
     assert "licence" in r.text
     [c] = [c for c in r.changes if c.after == "licence"]
     assert c.decided_by == "cache"
+
+
+def test_replay_cache_gates_style_items():
+    from adjudicate import Decision
+    text = "We bought apples, pears and plums.\n"
+    opts = dict(target="us", style="chicago")
+    off = api.fix(text, api.Options(**opts), None, Cache(None))
+    assert off.text == text and off.decisions == []
+    assert any(i.kind == "alert" and "SerialComma" in i.check for i in off.review)
+
+    on = api.fix(text, api.Options(**opts, replay_cache=True), None, Cache(None))
+    assert on.text == text and on.unasked == 0
+    assert any(i.kind == "undecided" for i in on.review)
+
+    [it] = [d.item for d in on.decisions]
+    cache = Cache(None)
+    cache.put(Cache.key("us", it), Decision(it, it.options[0], 0.95, "serial comma"))
+    r = api.fix(text, api.Options(**opts, replay_cache=True), None, cache)
+    assert "pears, and plums" in r.text
+    [c] = [c for c in r.changes if "," in c.after and c.after != c.before]
+    assert c.decided_by == "cache"
+
+
+def test_replay_cache_gates_capitalised_fallback():
+    on_text = lambda rc: api.fix(SAMPLE, api.Options(target="us", replay_cache=rc),
+                                 None, Cache(None))
+    off, on = on_text(False), on_text(True)
+    assert "Center" in off.text
+    assert any(c.before == "Centre" and c.decided_by == "rule" for c in off.changes)
+    assert "Centre" in on.text and not any(c.before == "Centre" for c in on.changes)
