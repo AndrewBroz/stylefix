@@ -31,7 +31,9 @@ class Stats:
 
 # --- quotes ---------------------------------------------------------------
 
-_OPEN_BEFORE = set(" \t\n([{—–-/")
+_WORD = "\ue000"       # stands for a protected span that behaves like a word
+_OPENER = "\ue001"     # ... or like a line start / tag boundary (a quote after it opens)
+_OPEN_BEFORE = set(" \t\n([{—–-/" + _OPENER)
 
 
 def straighten_apostrophes(s: str, stats: Stats) -> str:
@@ -152,9 +154,6 @@ def dates_uk(s: str, stats: Stats) -> str:
 
 # --- driver ----------------------------------------------------------------
 
-_SENTINEL = "\ue000"
-
-
 def normalize(text: str, target: str, guide: str = "none") -> tuple[str, Stats]:
     from .styleguides import get
     g = get(guide)
@@ -174,16 +173,16 @@ def normalize(text: str, target: str, guide: str = "none") -> tuple[str, Stats]:
 
     # Protected spans become one sentinel each, so a quote is judged by what really
     # surrounds it in the document and quotes pair up across constructs.
-    if _SENTINEL in text:
+    if _WORD in text or _OPENER in text:
         return map_prose(text, fn), stats
     spans, masked, cursor = protected_spans(text), [], 0
     held = []
     for st, en in spans:
         masked.append(text[cursor:st])
-        masked.append(_SENTINEL)
         held.append(text[st:en])
+        masked.append(_OPENER if held[-1][-1:].isspace() or held[-1][-1:] == ">" else _WORD)
         cursor = en
     masked.append(text[cursor:])
     out = fn("".join(masked))
     parts = iter(held)
-    return re.sub(_SENTINEL, lambda m: next(parts), out), stats
+    return re.sub(f"[{_WORD}{_OPENER}]", lambda m: next(parts), out), stats

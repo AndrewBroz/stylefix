@@ -76,3 +76,12 @@ def test_uk_single_primary_across_a_construct():
 def test_dash_beside_protected_quotes():
     out, _ = normalize('Read "#draft" and "$x$" -- now.\n', "us", "chicago")
     assert out == "Read “#draft” and “$x$”—now.\n"
+
+
+def test_quote_after_a_line_start_or_tag_opens():
+    for text, want in [('---\ntitle: x\n---\n"Hello," she said.\n', '---\ntitle: x\n---\n“Hello,” she said.\n'),
+                       ('<b>"bold"</b>\n', "<b>“bold”</b>\n"),
+                       ('Say <em>"hi"</em>.\n', "Say <em>“hi”</em>.\n"),
+                       ('said. <br>"Bye," she said.\n', "said. <br>“Bye,” she said.\n"),
+                       ('<https://x.y>"quoted"\n', "<https://x.y>“quoted”\n")]:
+        assert normalize(text, "us")[0] == want, text
