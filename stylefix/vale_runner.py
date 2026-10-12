@@ -24,6 +24,10 @@ class ValeError(RuntimeError):
     pass
 
 
+class ValeNotFound(ValeError):
+    pass
+
+
 @dataclass
 class Alert:
     line: int          # 1-indexed
@@ -54,7 +58,7 @@ class Alert:
 def find_vale() -> str:
     exe = shutil.which("vale")
     if not exe:
-        raise ValeError("vale not found on PATH. Install it: https://vale.sh/docs/install "
+        raise ValeNotFound("vale not found on PATH. Install it: https://vale.sh/docs/install "
                         "(e.g. `brew install vale`).")
     return exe
 
@@ -111,3 +115,12 @@ def run_vale(path: Path, target: str, guide: str = "none", oxford_ize: bool = Fa
         alerts.extend(Alert.from_json(d) for d in items)
     alerts.sort(key=lambda a: (a.line, a.start))
     return alerts
+
+
+def run_vale_text(text: str, target: str, guide: str = "none", oxford_ize: bool = False,
+                  accept_words: list[str] | None = None) -> list[Alert]:
+    """run_vale on a string (Vale reads files, so through a temporary one)."""
+    with tempfile.TemporaryDirectory(prefix="stylefix-in-") as tmp:
+        path = Path(tmp) / "input.md"
+        path.write_text(text, encoding="utf-8")
+        return run_vale(path, target, guide, oxford_ize, accept_words)

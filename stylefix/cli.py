@@ -12,15 +12,11 @@ from pathlib import Path
 
 from adjudicate import check_endpoint, run_setup
 
-from . import __version__, abbreviations, candidates, changelog, patterns, report, spellcheck, styleguides, styleitems
-from .adjudicate import Cache, Item, adjudicate
-from .apply import Edit, apply_edits, match_case, to_offsets
-from .context import at_sentence_start, inside_quotes, sentence_context
-from .conventions import normalize
+from . import __version__, api, changelog, report, styleguides
+from .adjudicate import Cache
+from .api import partition  # noqa: F401
 from .llm import ConfigError, resolve_endpoint
-from .vale_runner import Alert, ValeError, run_vale
-
-FRONT_MATTER = re.compile(r"\A---\n.*?\n---\n", re.S)
+from .vale_runner import ValeError, find_vale
 
 
 DESCRIPTION = """\
@@ -186,87 +182,6 @@ def build_parser() -> argparse.ArgumentParser:
     return p
 
 
-def partition(text: str, alerts: list[Alert], target: str, guide: str,
-              oxford: bool = False, adjudicate_style: bool = False):
-    """Split Vale alerts into deterministic edits, adjudication items, and review.
-
-    Style-guide alerts (serial comma, numerals) become items when a model is
-    available to adjudicate them; otherwise they stay review alerts."""
-    style = styleguides.get(guide)
-    fm = FRONT_MATTER.match(text)
-    fm_lines = text[:fm.end()].count("\n") if fm else 0
-    edits: list[Edit] = []
-    items: list[Item] = []
-    review: list[Alert] = []
-    next_id = 1
-    # Table hits win over pattern hits on the same span.
-    table_spans = {(a.line, a.start, a.end) for a in alerts if a.replacement}
-    table_lines = {}
-    for a in alerts:
-        if a.replacement:
-            table_lines.setdefault(a.line, []).append((a.start, a.end))
-    for a in alerts:
-        if a.line <= fm_lines:
-            continue  # never touch front matter
-        s, e = to_offsets(text, Edit(a.line, a.start, a.end, a.match, "", ""))
-        rule = a.check.rsplit(".", 1)[-1]
-        if rule in patterns.CHECK_FAMILY:
-            if any(st <= a.start <= en or st <= a.end <= en for st, en in table_lines.get(a.line, [])):
-                continue
-            out = patterns.decide(a.match, patterns.CHECK_FAMILY[rule], target, oxford)
-            if out.status in ("skip", "reject"):
-                continue
-            if out.status == "ask":
-                items.append(Item(next_id, a.match, (match_case(a.match, out.candidate), "KEEP"),
-                                  f"'{a.match}' looks like it takes the {target.upper()} ending "
-                                  f"'{out.candidate[-4:]}', but neither spelling is in our dictionaries. "
-                                  "Choose the rewritten form if this is an ordinary English word with "
-                                  "that ending; KEEP if it is a name, a deliberate coinage, or not "
-                                  "that suffix at all.",
-                                  sentence_context(text, s, e), a.line, a.start, a.end,
-                                  source="pattern"))
-                next_id += 1
-                continue
-            # auto: treat exactly like a table replacement from here on
-            a = Alert(a.line, a.start, a.end, a.check, a.match, a.message, a.severity,
-                      "replace", [out.candidate])
-        if a.replacement:
-            capitalized = a.match[:1].isupper() and not a.match.isupper() \
-                and not at_sentence_start(text, s)
-            quoted = inside_quotes(text, s)
-            if capitalized or quoted:
-                why = ("Capitalised mid-sentence: may be a proper name or title."
-                       if capitalized else "Inside a quotation: quoted text keeps its own spelling.")
-                items.append(Item(next_id, a.match,
-                                  (match_case(a.match, a.replacement), "KEEP"),
-                                  why + " Otherwise use the target spelling.",
-                                  sentence_context(text, s, e), a.line, a.start, a.end,
-                                  source="capitalized" if capitalized else "quoted"))
-                next_id += 1
-            else:
-                edits.append(Edit(a.line, a.start, a.end, a.match, a.replacement, a.check))
-        elif adjudicate_style and a.check.rsplit(".", 1)[-1] == "Numbers":
-            built = styleitems.candidate(a.check, a.match, style)
-            if built is None:
-                review.append(a)
-                continue
-            cand, rule = built
-            items.append(Item(next_id, a.match, (cand, "KEEP"), rule,
-                              sentence_context(text, s, e), a.line, a.start, a.end, source="style"))
-            next_id += 1
-        elif a.check.endswith(".Ambiguous"):
-            cand = candidates.lookup(target, a.match, oxford)
-            if cand is None:
-                review.append(a)
-                continue
-            items.append(Item(next_id, a.match, cand.options, cand.rule,
-                              sentence_context(text, s, e), a.line, a.start, a.end))
-            next_id += 1
-        else:
-            review.append(a)
-    return edits, items, review
-
-
 BUILTIN_ACCEPT = Path(__file__).parent / "accept.txt"
 
 
@@ -323,7 +238,7 @@ def main(argv: list[str] | None = None) -> int:
 
     accept = load_accept_lists(args.accept, args.no_default_accept)
     try:
-        alerts = run_vale(args.input, args.target, guide, args.oxford_ize, accept)
+        find_vale()                       # same error, same order as before the endpoint
     except ValeError as e:
         print(f"stylefix: {e}", file=sys.stderr)
         return 2
@@ -333,58 +248,24 @@ def main(argv: list[str] | None = None) -> int:
     except ConfigError as e:
         print(f"stylefix: {e}", file=sys.stderr)
         return 2
-    edits, items, review = partition(text, alerts, args.target, guide, args.oxford_ize,
-                                     adjudicate_style=ep is not None)
-    series, series_edits = styleitems.series_items(text, styleguides.get(guide), next_id=len(items) + 1)
-    if ep is not None:
-        items += series
-    else:
-        for it in series:
-            review.append(Alert(it.line, it.start, it.end, f"{styleguides.get(guide).title}.SerialComma",
-                                it.word, f"{styleguides.get(guide).title}: check the comma before "
-                                f"'and'/'or' in '{it.word[:60]}'.", "suggestion", "", []))
-    ab_edits, ab_items, ab_warnings = abbreviations.plan(text, guide, args.abbreviation_nouns,
-                                                         next_id=len(items) + 1)
-    edits += ab_edits
-    title = styleguides.get(guide).title or "Style"
-    if ep is not None:
-        items += ab_items
-    else:
-        for it in ab_items:
-            review.append(Alert(it.line, it.start, it.end, f"{title}.Abbreviation", it.word,
-                                f"'{it.word}': sentence end, name, or initials? Needs a model to decide.",
-                                "suggestion", "", []))
-    for line, phrase in ab_warnings:
-        review.append(Alert(line, 1, 1, f"{title}.AbbreviationNoun", phrase,
-                            f"'{phrase}': {title} writes the noun out as 'the United States' and keeps "
-                            f"the abbreviation for adjectives. --abbreviation-nouns enforce applies it.",
-                            "suggestion", "", []))
-    if items and ep is None:
+    cache = Cache(None if args.no_cache else args.cache)
+    try:
+        r = api.fix(text, api.Options(target=args.target, style=args.style,
+                                      oxford_ize=args.oxford_ize, accept=accept,
+                                      abbreviation_nouns=args.abbreviation_nouns,
+                                      min_confidence=args.min_confidence,
+                                      batch_size=args.batch_size, parallel=args.parallel,
+                                      verbose=args.verbose), ep, cache)
+    except ValeError as e:
+        print(f"stylefix: {e}", file=sys.stderr)
+        return 2
+    if r.unasked:
         print(f"stylefix: no model endpoint available (--llm {args.llm}); "
-              f"{len(items)} ambiguous word(s) will be listed for review"
+              f"{r.unasked} ambiguous word(s) will be listed for review"
               + ("; run `stylefix --setup` to configure one" if args.llm == "auto" else ""),
               file=sys.stderr)
-    cache = Cache(None if args.no_cache else args.cache)
-    decisions = adjudicate(ep, args.target, items, cache, args.batch_size,
-                           args.parallel, args.verbose)
-    for d in decisions:
-        if d.choice is not None and d.confidence < args.min_confidence:
-            d.reason = f"low confidence ({d.confidence:.2f}): {d.reason}"
-            d.choice = None
-        # With no model, capitalised deterministic swaps are still applied.
-        if d.choice is None and ep is None and d.item.source == "capitalized":
-            d.choice, d.reason = d.item.options[0], "applied without adjudication"
-        rep = d.replacement
-        if rep and d.item.id in series_edits:
-            e = series_edits[d.item.id]
-            edits.append(Edit(e.line, e.start, e.end, e.original, e.replacement, "adjudicated"))
-        elif rep:
-            edits.append(Edit(d.item.line, d.item.start, d.item.end, d.item.word, rep, "adjudicated"))
-
-    new_text, skipped = apply_edits(text, edits)
-    new_text, stats = normalize(new_text, args.target, guide)
-    applied = [e for e in edits if e not in skipped]
-    review += spellcheck.review_spellings(new_text, args.target, set(accept or ()))
+    guide, new_text, applied, skipped = r.guide, r.text, r.applied, r.rejected
+    decisions, stats, review = r.decisions, r.stats, r.review_alerts
 
     if args.dry_run:
         sys.stdout.writelines(difflib.unified_diff(
