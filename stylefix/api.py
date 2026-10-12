@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from adjudicate import Annotation, Change, ReviewItem, Skipped, derive_changes
+from adjudicate import protected_spans, Annotation, Change, ReviewItem, Skipped, derive_changes
 from adjudicate.core import Decision
 from adjudicate.llm import Endpoint
 
@@ -38,10 +38,13 @@ def partition(text: str, alerts: list[Alert], target: str, guide: str,
     for a in alerts:
         if a.replacement:
             table_lines.setdefault(a.line, []).append((a.start, a.end))
+    protected = protected_spans(text)
     for a in alerts:
         if a.line <= fm_lines:
             continue  # never touch front matter
         s, e = to_offsets(text, Edit(a.line, a.start, a.end, a.match, "", ""))
+        if any(s < pe and e > ps for ps, pe in protected):
+            continue  # code, links, Obsidian syntax: never edited, never asked about
         rule = a.check.rsplit(".", 1)[-1]
         if rule in patterns.CHECK_FAMILY:
             if any(st <= a.start <= en or st <= a.end <= en for st, en in table_lines.get(a.line, [])):

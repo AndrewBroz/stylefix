@@ -115,3 +115,14 @@ def test_replay_cache_gates_capitalised_fallback():
     assert "Center" in off.text
     assert any(c.before == "Centre" and c.decided_by == "rule" for c in off.changes)
     assert "Centre" in on.text and not any(c.before == "Centre" for c in on.changes)
+
+
+def test_nothing_inside_obsidian_constructs_is_touched():
+    text = ("See [[Programme Notes|the programme note]] and ![[colour-wheel.png]] about the colour.\n"
+            "Tagged #policy/colour and %%a private colour remark%% with ^colour-1\n")
+    r = api.fix(text, api.Options(target="us", require_vale=True), None, Cache(None))
+    for piece in ("[[Programme Notes|the programme note]]", "![[colour-wheel.png]]", "#policy/colour",
+                  "%%a private colour remark%%", "^colour-1"):
+        assert piece in r.text, piece
+    assert "about the color." in r.text
+    assert not any("colour" in (i.message or "") and i.line == 2 for i in r.review)

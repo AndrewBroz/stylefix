@@ -152,6 +152,9 @@ def dates_uk(s: str, stats: Stats) -> str:
 
 # --- driver ----------------------------------------------------------------
 
+_SENTINEL = "\ue000"
+
+
 def normalize(text: str, target: str, guide: str = "none") -> tuple[str, Stats]:
     from .styleguides import get
     g = get(guide)
@@ -169,4 +172,18 @@ def normalize(text: str, target: str, guide: str = "none") -> tuple[str, Stats]:
         seg = dates_us(seg, stats) if target == "us" else dates_uk(seg, stats)
         return seg
 
-    return map_prose(text, fn), stats
+    # Protected spans become one sentinel each, so a quote is judged by what really
+    # surrounds it in the document and quotes pair up across constructs.
+    if _SENTINEL in text:
+        return map_prose(text, fn), stats
+    spans, masked, cursor = protected_spans(text), [], 0
+    held = []
+    for st, en in spans:
+        masked.append(text[cursor:st])
+        masked.append(_SENTINEL)
+        held.append(text[st:en])
+        cursor = en
+    masked.append(text[cursor:])
+    out = fn("".join(masked))
+    parts = iter(held)
+    return re.sub(_SENTINEL, lambda m: next(parts), out), stats

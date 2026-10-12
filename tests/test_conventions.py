@@ -54,3 +54,25 @@ def test_html_comments_and_tags_are_protected():
     src = "<!-- note -- keep -->\nvalue -- here\n<a href=\"x--y\">it's</a>\n"
     out, _ = normalize(src, "us", "chicago")
     assert out == "<!-- note -- keep -->\nvalue—here\n<a href=\"x--y\">it’s</a>\n"
+
+
+def test_quotes_next_to_protected_text_keep_their_direction():
+    for text, want in [('"[[Note]]"', "“[[Note]]”"), ('"$x$"', "“$x$”"),
+                       ('"word"', "“word”"), ('He said "[[Programme Notes]]".', "He said “[[Programme Notes]]”.")]:
+        out, _ = normalize(text + "\n", "us")
+        assert out == want + "\n", (text, out)
+
+
+def test_single_quotes_around_a_tag():
+    assert normalize("'#tag'\n", "uk")[0] == "‘#tag’\n"
+    assert normalize("'#tag'\n", "us")[0] == "“#tag”\n"
+
+
+def test_uk_single_primary_across_a_construct():
+    out, _ = normalize('"[[Note]]" and "word"\n', "uk")
+    assert out == "‘[[Note]]’ and ‘word’\n"
+
+
+def test_dash_beside_protected_quotes():
+    out, _ = normalize('Read "#draft" and "$x$" -- now.\n', "us", "chicago")
+    assert out == "Read “#draft” and “$x$”—now.\n"
