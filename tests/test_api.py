@@ -50,3 +50,38 @@ def test_no_model_fallbacks_are_labelled_rule():
     assert not any(c.decided_by == "model" for c in r.changes)
     centre = [c for c in r.changes if c.before.lower() == "centre"]
     assert centre and all(c.decided_by == "rule" for c in centre)
+
+
+def test_without_vale_the_python_tiers_still_run(monkeypatch):
+    monkeypatch.setenv("PATH", "/nonexistent")
+    with pytest.raises(api.ValeNotFound):
+        api.fix(SAMPLE, api.Options(target="us"), None, Cache(None))
+    r = api.fix('He said "hi" -- then left.\n', api.Options(target="us", require_vale=False),
+                None, Cache(None))
+    assert r.skipped and r.skipped[0].why == "Vale not found"
+    assert "—" in r.text                                # punctuation still normalised
+
+
+def test_skip_punctuation_leaves_quotes():
+    r = api.fix('He said "hi".\n', api.Options(target="us", skip=frozenset({"punctuation"})),
+                None, Cache(None))
+    assert '"hi"' in r.text
+
+
+def test_skip_all_vale_tiers_does_not_need_vale(monkeypatch):
+    monkeypatch.setenv("PATH", "/nonexistent")
+    r = api.fix("Text.\n", api.Options(target="us", skip=api.VALE_TIERS), None, Cache(None))
+    assert r.skipped == []
+
+
+def test_replay_cache_answers_from_cache(tmp_path):
+    from adjudicate import Decision, Item
+    text = "The license was granted.\n"
+    first = api.fix(text, api.Options(target="uk", replay_cache=True), None, Cache(None))
+    [it] = [d.item for d in first.decisions]
+    cache = Cache(tmp_path / "c.json")
+    cache.put(Cache.key("uk", it), Decision(it, "licence", 0.95, "noun"))
+    r = api.fix(text, api.Options(target="uk", replay_cache=True), None, cache)
+    assert "licence" in r.text
+    [c] = [c for c in r.changes if c.after == "licence"]
+    assert c.decided_by == "cache"
