@@ -1,6 +1,6 @@
 [project]
 name = "stylefix"
-version = "0.8.0"
+version = "0.8.1"
 description = "Regularize a Markdown file to US or UK English and a style guide, using Vale plus a language model for the ambiguous cases."
 readme = "README.md"
 requires-python = ">=3.11"

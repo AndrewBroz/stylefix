@@ -143,7 +143,25 @@ def set_primary_quotes(s: str, primary: str, stats: Stats, move_punct: bool) -> 
 _DASH = re.compile(r"(?<![-\d–])([ \t]*)(?:(?<!-)--(?!-)|—|(?<=\s)–(?=\s))([ \t]*)(?![-\d–])")
 
 
+# A GFM table delimiter row, and the list or quote marker (with its space) at a line start.
+_DELIMITER_ROW = re.compile(r"^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)+\|?\s*$")
+_LINE_MARKER = re.compile(r"^[ \t]*(?:>[ \t]?)*(?:(?:[-*+]|\d+[.)])[ \t]+)?")
+
+
 def parenthetical_dashes(s: str, style: str, stats: Stats) -> str:
+    """Per line: a table delimiter row is left alone, and a list or quote
+    marker with its space is kept, the rule seeing only what follows it."""
+    out = []
+    for line in s.splitlines(keepends=True):
+        if _DELIMITER_ROW.match(line):
+            out.append(line)
+            continue
+        cut = _LINE_MARKER.match(line).end()
+        out.append(line[:cut] + _parenthetical_dashes(line[cut:], style, stats))
+    return "".join(out)
+
+
+def _parenthetical_dashes(s: str, style: str, stats: Stats) -> str:
     """style: 'em' unspaced em dash; 'em-spaced' spaced em dash; 'en-spaced'.
     The guide's spacing applies within the line: at a line start the
     indentation is kept and no space is added before the dash; at a line end

@@ -141,3 +141,17 @@ def test_front_matter_after_a_byte_order_mark_is_left_alone():
     r = api.fix(head + "\nThe colour programme -- ok.\n", api.Options(target="us", style="chicago"),
                 None, Cache(None))
     assert r.text == head + "\nThe color program—ok.\n"
+
+
+@pytest.mark.parametrize("text", ["It arrived on 3 September.\n", "Due September 3 at noon.\n",
+                                  "Filed 3 Sept and 4 Oct.\n", "On 3/9/2026 we met.\n",
+                                  "Since 2026-10-12.\n", "The 9th of May.\n"])
+def test_numerals_in_dates_are_not_flagged(text):
+    r = api.fix(text, api.Options(target="uk", style="oxford"), None, Cache(None))
+    assert not [a for a in r.review_alerts if a.check.endswith("Numbers")]
+    assert not [i for i in r.review if i.check.endswith("Numbers")]
+
+
+def test_numerals_elsewhere_still_flagged():
+    r = api.fix("We hired 3 people.\n", api.Options(target="uk", style="oxford"), None, Cache(None))
+    assert [a for a in r.review_alerts if a.check.endswith("Numbers")]

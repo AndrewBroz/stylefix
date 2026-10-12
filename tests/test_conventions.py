@@ -211,3 +211,17 @@ ROWS = [
 def test_quote_direction_around_protected_spans(text, us, uk, target):
     want = us if target == "us" else uk
     assert normalize(text + "\n", target)[0] == want + "\n"
+
+
+@pytest.mark.parametrize("target", ["us", "uk"])
+@pytest.mark.parametrize("text", ["| A | B |\n|--|--|\n| x | y |\n",
+                                  "| A | B |\n| -- | :--: |\n| x | y |\n",
+                                  "- -- dashed item\n", "> -- quoted aside\n", "1. -- numbered\n",
+                                  "---\n", "- - -\n"])
+def test_markdown_structure_survives_dashes(text, target):
+    out, _ = normalize(text, target, "chicago" if target == "us" else "oxford")
+    for line_in, line_out in zip(text.splitlines(), out.splitlines()):
+        marker = line_in.split(" ", 1)[0]
+        assert line_out.startswith(marker + " ") or line_out == line_in   # marker and its space kept
+    if text.startswith(("|", "---", "- - -")):
+        assert out == text                                                 # delimiter rows, rules untouched

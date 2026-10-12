@@ -74,6 +74,21 @@ def detect_variety(text: str, accept: Iterable[str] = ()) -> Detection:
     return Detection(None, uk, us)
 
 
+_MONTH = (r"(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|june?|july?|aug(?:ust)?"
+          r"|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\.?")
+_DATE_BEFORE = re.compile(rf"\b{_MONTH}\s*$", re.I)
+_DATE_AFTER = re.compile(rf"^\s*(?:(?:st|nd|rd|th)\b\s*)?(?:of\s+)?{_MONTH}\b", re.I)
+_DATE_SHAPE = re.compile(r"\d{1,4}[/.-]\d{1,2}[/.-]\d{1,4}|\d+(?:st|nd|rd|th)\b")
+
+
+def _is_date_numeral(text: str, s: int, e: int) -> bool:
+    """A numeral next to a month name or inside a date pattern is a date, not a count."""
+    before, after = text[max(0, s - 16):s], text[e:e + 24]
+    if _DATE_BEFORE.search(before) or _DATE_AFTER.match(after):
+        return True
+    return bool(_DATE_SHAPE.search(text[max(0, s - 6):e + 8]))
+
+
 def partition(text: str, alerts: list[Alert], target: str, guide: str,
               oxford: bool = False, adjudicate_style: bool = False):
     """Split Vale alerts into deterministic edits, adjudication items, and review.
@@ -101,6 +116,10 @@ def partition(text: str, alerts: list[Alert], target: str, guide: str,
         if any(s < pe and e > ps for ps, pe in protected):
             continue  # code, links, Obsidian syntax: never edited, never asked about
         rule = a.check.rsplit(".", 1)[-1]
+        if rule == "Numbers":
+            ns = s + (len(a.match) - len(a.match.lstrip()))
+            if _is_date_numeral(text, ns, e - (len(a.match) - len(a.match.rstrip()))):
+                continue  # dates keep their numerals, with or without a model
         if rule in patterns.CHECK_FAMILY:
             if any(st <= a.start <= en or st <= a.end <= en for st, en in table_lines.get(a.line, [])):
                 continue
