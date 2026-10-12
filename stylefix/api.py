@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
+import functools
 import re
 from dataclasses import dataclass
 
-from adjudicate import protected_spans, Annotation, Change, ReviewItem, Skipped, derive_changes
+from adjudicate import prose_regions, protected_spans, Annotation, Change, ReviewItem, Skipped, derive_changes
 from adjudicate.core import Decision
 from adjudicate.llm import Endpoint
 
-from . import abbreviations, candidates, patterns, spellcheck, styleguides, styleitems
+from . import abbreviations, candidates, patterns, spellcheck, styleguides, styleitems, varcon
 from .adjudicate import Cache, Item, adjudicate
 from .apply import Edit, apply_edits, match_case, to_offsets
 from .context import at_sentence_start, inside_quotes, sentence_context
@@ -17,6 +18,49 @@ from .conventions import Stats, normalize
 from .vale_runner import Alert, ValeNotFound, run_vale_text
 
 FRONT_MATTER = re.compile(r"\A\ufeff?---\n.*?\n---\n", re.S)  # an optional byte-order mark first
+
+
+@dataclass(frozen=True)
+class Detection:
+    target: str | None
+    uk: int
+    us: int
+
+
+_DETECT_WORD = re.compile(r"[a-z]+(?:[’'][a-z]+)?")
+
+
+@functools.lru_cache(maxsize=1)
+def _variety_words() -> tuple[frozenset[str], frozenset[str]]:
+    """Spellings VarCon gives to one variety and not the other."""
+    uk, us = set(), set()
+    for c in varcon.clusters():
+        b, a = c.accepted("B"), c.accepted("A")
+        uk |= b - a
+        us |= a - b
+    return frozenset(uk), frozenset(us)
+
+
+def detect_variety(text: str, accept=()) -> Detection:
+    """Which variety a text is written in, from words only one variety uses."""
+    uk_words, us_words = _variety_words()
+    skip = {w.lower() for w in accept}
+    seen_uk, seen_us = set(), set()
+    for s, e in prose_regions(text):
+        for m in _DETECT_WORD.finditer(text, s, e):
+            w = m.group(0)
+            if w in skip or inside_quotes(text, m.start()):
+                continue
+            if w in uk_words:
+                seen_uk.add(w)
+            elif w in us_words:
+                seen_us.add(w)
+    uk, us = len(seen_uk), len(seen_us)
+    if uk >= 2 and uk >= 2 * us:
+        return Detection("uk", uk, us)
+    if us >= 2 and us >= 2 * uk:
+        return Detection("us", uk, us)
+    return Detection(None, uk, us)
 
 
 def partition(text: str, alerts: list[Alert], target: str, guide: str,
