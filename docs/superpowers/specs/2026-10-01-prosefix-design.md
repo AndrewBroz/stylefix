@@ -282,8 +282,7 @@ the plan). `uv tool install prosefix` remains the non-Homebrew route.
 - Within schema 1, fields may be added and never removed or changed in
   meaning; a breaking change increments `schema`.
 
-The Obsidian plugin applies a subset of changes by splicing in descending
-offset order; any subset closed under `depends_on` yields valid text.
+The Obsidian plugin applies a selection closed under `depends_on`: it drops every change a selected change depends on, then splices the rest in descending `(start, end)` order (see Amendments).
 
 ## 5. Obsidian syntax
 
@@ -334,6 +333,20 @@ In order, each with the existing release checks (sdist listing,
 3. prosefix 0.1.0 — new repository `AndrewBroz/prosefix`, PyPI, man page.
 4. The Homebrew tap and formula.
 5. Follow-up, not in this spec: mdmemo calls prosefix.
+
+## Amendments (2026-10-12, from planning)
+
+1. **Changes are derived, not collected.** stylefix's `normalize()` rewrites quotes, dashes, ranges and apostrophes without recording edits, and proofix rewrites its text in several passes whose edit records refer to intermediate texts. So each pass's `Result.changes` is computed by diffing its input and output (lines, then tokens within changed lines); the pass's edit records and decisions only *label* the hunks (check, reason, decided_by, confidence). Faithfulness then holds by construction. A hunk no record matches gets the pass's default label (`punctuation` for stylefix, `proofix` for proofix) and `decided_by: "rule"`.
+
+2. **`depends_on` means "supersedes".** A change listing `depends_on` already contains the full effect of the changes it lists over its span. Applying a selection: drop every change a selected change depends on, then splice the rest in descending `(start, end)` order. Valid selections are those closed under `depends_on` (selecting a change selects its dependencies).
+
+3. **Two cache files.** proofix's comma decisions keep their own cache format, so a project has `.prosefix/cache.json` and `.prosefix/commas.json`; the `cache` setting names the first and the second sits beside it.
+
+4. **`replay_cache`.** With no endpoint, stylefix sends style items straight to review and proofix skips compounds, so a cache could not be replayed. Both `Options` gain `replay_cache: bool = False`: with no endpoint, build every adjudication item as if a model were present and answer it from the cache only. prosefix sets it for `--llm cached`. CLIs leave it off (behaviour unchanged).
+
+5. **Vale runs on a temporary file** inside `stylefix.api.fix` (Vale reads files); "no file I/O" means none on the caller's files.
+
+6. **proofix's LanguageTool replay fixture** in `tests/test_e2e.py` patches `proofix.api` instead of `proofix.cli` (two lines), because the calls move. This is the one permitted edit to an existing test.
 
 ## Risks
 
