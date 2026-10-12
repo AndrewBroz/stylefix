@@ -31,7 +31,11 @@ class Stats:
 
 # --- quotes ---------------------------------------------------------------
 
-_SENTINEL = "\ue000"   # stands for one protected span while quotes are resolved
+# While quotes are resolved each protected span becomes one sentinel character of its kind.
+_WORD_SPAN = "\ue000"      # inline code, wikilinks/embeds, #tags, inline maths, entities, link targets, URLs
+_BOUNDARY_SPAN = "\ue001"  # front matter, fences, block maths, %% comments, HTML tags/comments/autolinks, callouts
+_SENTINELS = _WORD_SPAN + _BOUNDARY_SPAN
+_CLOSE_AFTER_BOUNDARY = set(".,;:!?)]}—–\"'”’")
 _OPEN_BEFORE = set(" \t\n([{—–-/")
 
 
@@ -39,7 +43,7 @@ def straighten_apostrophes(s: str, stats: Stats) -> str:
     def rep(m):
         stats.apostrophes += 1
         return "’"
-    s = re.sub(r"(?<=\w)'(?=\w)", rep, s)            # don't, it's, o'clock
+    s = re.sub(r"(?<=[\w\ue000])'(?=\w)", rep, s)    # don't, it's, o'clock, [[Note]]'s
     s = re.sub(r"(?<=\w)'(?=\s|$|[.,;:!?)])(?![\"'])", lambda m: rep(m) if _plural_possessive(s, m) else m.group(0), s)
     s = re.sub(r"(?<![\w])'(?=\d\ds\b)", rep, s)       # '90s
     return s
@@ -61,14 +65,23 @@ def _plural_possessive(s: str, m: re.Match) -> bool:
 def curl_straight_quotes(s: str, stats: Stats) -> str:
     out = []
 
+    def after_boundary(i: int) -> bool:
+        # After a boundary (a tag, a fence, front matter, or a line break right after
+        # any span) a quote opens unless what follows ends a phrase.
+        nxt = s[i + 1] if i + 1 < len(s) else ""
+        return bool(nxt) and not nxt.isspace() and nxt not in _CLOSE_AFTER_BOUNDARY
+
     def opens(i: int) -> bool:
         if i == 0:
             return True
-        # After a protected span (or the line break that follows one, as after a fence)
-        # the span cannot say which way the quote faces; the next character does.
-        if s[i - 1] == _SENTINEL or (s[i - 1] == "\n" and i > 1 and s[i - 2] == _SENTINEL):
-            return i + 1 < len(s) and s[i + 1].isalnum()
-        return s[i - 1] in _OPEN_BEFORE
+        prev = s[i - 1]
+        if prev == _BOUNDARY_SPAN or (prev == "\n" and i > 1 and s[i - 2] in _SENTINELS):
+            return after_boundary(i)
+        if prev == _WORD_SPAN:
+            # As after a word: closing (an apostrophe was already curled), except that a
+            # double quote run into a following word opens, as in [[A]]"Hello".
+            return s[i] == '"' and i + 1 < len(s) and s[i + 1].isalnum()
+        return prev in _OPEN_BEFORE
 
     for i, ch in enumerate(s):
         if ch == '"':
@@ -99,7 +112,8 @@ def set_primary_quotes(s: str, primary: str, stats: Stats, move_punct: bool) -> 
                 stats.quotes += 1
             out.append(o)
         elif ch == "”" or (ch == "’" and stack and stack[-1] == "‘"
-                           and not (i + 1 < len(s) and s[i + 1].isalnum() and i > 0 and s[i - 1].isalnum())):
+                           and not (i + 1 < len(s) and s[i + 1].isalnum() and i > 0
+                                    and (s[i - 1].isalnum() or s[i - 1] == _WORD_SPAN))):
             if not stack:
                 out.append(ch)
             else:
@@ -182,16 +196,22 @@ def normalize(text: str, target: str, guide: str = "none") -> tuple[str, Stats]:
 
     # Protected spans become one sentinel each, so a quote is judged by what really
     # surrounds it in the document and quotes pair up across constructs.
-    if _SENTINEL in text:
+    if any(c in text for c in _SENTINELS):
         return map_prose(text, fn), stats
-    spans, masked, cursor = protected_spans(text), [], 0
-    held = []
-    for st, en in spans:
+    masked, held, cursor = [], [], 0
+    for st, en in protected_spans(text):
+        span = text[st:en]
         masked.append(text[cursor:st])
-        masked.append(_SENTINEL)
-        held.append(text[st:en])
+        masked.append(_BOUNDARY_SPAN if _is_boundary(span) else _WORD_SPAN)
+        held.append(span)
         cursor = en
     masked.append(text[cursor:])
     out = fn("".join(masked))
     parts = iter(held)
-    return re.sub(_SENTINEL, lambda m: next(parts), out), stats
+    return re.sub(f"[{_SENTINELS}]", lambda m: next(parts), out), stats
+
+
+def _is_boundary(span: str) -> bool:
+    """Front matter, fences, block maths, %% comments, HTML tags, comments and
+    autolinks, and callout markers mark a boundary; anything else reads as a word."""
+    return "\n" in span or span.endswith(">") or span.lstrip().startswith((">", "%%", "$$"))
