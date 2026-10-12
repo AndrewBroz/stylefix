@@ -78,10 +78,25 @@ def test_dash_beside_protected_quotes():
     assert out == "Read “#draft” and “$x$”—now.\n"
 
 
-def test_quote_after_a_line_start_or_tag_opens():
-    for text, want in [('---\ntitle: x\n---\n"Hello," she said.\n', '---\ntitle: x\n---\n“Hello,” she said.\n'),
-                       ('<b>"bold"</b>\n', "<b>“bold”</b>\n"),
-                       ('Say <em>"hi"</em>.\n', "Say <em>“hi”</em>.\n"),
-                       ('said. <br>"Bye," she said.\n', "said. <br>“Bye,” she said.\n"),
-                       ('<https://x.y>"quoted"\n', "<https://x.y>“quoted”\n")]:
-        assert normalize(text, "us")[0] == want, text
+import pytest
+
+ROWS = [
+    ("us", '"[[Note]]"', "“[[Note]]”"), ("us", '"$x$"', "“$x$”"),
+    ("us", 'He said "[[Programme Notes]]".', "He said “[[Programme Notes]]”."),
+    ("us", '---\ntitle: x\n---\n"Hello," she said.', '---\ntitle: x\n---\n“Hello,” she said.'),
+    ("us", '<b>"bold"</b>', "<b>“bold”</b>"), ("us", 'Say <em>"hi"</em>.', "Say <em>“hi”</em>."),
+    ("us", 'said. <br>"Bye," she said.', "said. <br>“Bye,” she said."),
+    ("us", '<https://x.y>"quoted"', "<https://x.y>“quoted”"),
+    ("us", '"see <b>this</b>" ok', "“see <b>this</b>” ok"),
+    ("us", '"<https://x.y>" z', "“<https://x.y>” z"),
+    ("uk", '"a <i>b</i>" and \'c\'', "‘a <i>b</i>’ and ‘c’"),
+    ("us", '"a <i>b</i>" and \'c\'', "“a <i>b</i>” and “c”"),
+    ("us", '"code `x`" end', "“code `x`” end"),
+    ("us", '"line\n```\nx\n```\n" end', "“line\n```\nx\n```\n” end"),
+    ("uk", "'#tag'", "‘#tag’"), ("uk", '"[[Note]]" and "word"', "‘[[Note]]’ and ‘word’"),
+]
+
+
+@pytest.mark.parametrize("target, text, want", ROWS)
+def test_quote_direction_around_protected_spans(target, text, want):
+    assert normalize(text + "\n", target)[0] == want + "\n"

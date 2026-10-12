@@ -31,9 +31,8 @@ class Stats:
 
 # --- quotes ---------------------------------------------------------------
 
-_WORD = "\ue000"       # stands for a protected span that behaves like a word
-_OPENER = "\ue001"     # ... or like a line start / tag boundary (a quote after it opens)
-_OPEN_BEFORE = set(" \t\n([{—–-/" + _OPENER)
+_SENTINEL = "\ue000"   # stands for one protected span while quotes are resolved
+_OPEN_BEFORE = set(" \t\n([{—–-/")
 
 
 def straighten_apostrophes(s: str, stats: Stats) -> str:
@@ -61,13 +60,23 @@ def _plural_possessive(s: str, m: re.Match) -> bool:
 
 def curl_straight_quotes(s: str, stats: Stats) -> str:
     out = []
+
+    def opens(i: int) -> bool:
+        if i == 0:
+            return True
+        # After a protected span (or the line break that follows one, as after a fence)
+        # the span cannot say which way the quote faces; the next character does.
+        if s[i - 1] == _SENTINEL or (s[i - 1] == "\n" and i > 1 and s[i - 2] == _SENTINEL):
+            return i + 1 < len(s) and s[i + 1].isalnum()
+        return s[i - 1] in _OPEN_BEFORE
+
     for i, ch in enumerate(s):
         if ch == '"':
             stats.quotes += 1
-            out.append("“" if i == 0 or s[i - 1] in _OPEN_BEFORE else "”")
+            out.append("“" if opens(i) else "”")
         elif ch == "'":
             stats.quotes += 1
-            out.append("‘" if i == 0 or s[i - 1] in _OPEN_BEFORE else "’")
+            out.append("‘" if opens(i) else "’")
         else:
             out.append(ch)
     return "".join(out)
@@ -173,16 +182,16 @@ def normalize(text: str, target: str, guide: str = "none") -> tuple[str, Stats]:
 
     # Protected spans become one sentinel each, so a quote is judged by what really
     # surrounds it in the document and quotes pair up across constructs.
-    if _WORD in text or _OPENER in text:
+    if _SENTINEL in text:
         return map_prose(text, fn), stats
     spans, masked, cursor = protected_spans(text), [], 0
     held = []
     for st, en in spans:
         masked.append(text[cursor:st])
+        masked.append(_SENTINEL)
         held.append(text[st:en])
-        masked.append(_OPENER if held[-1][-1:].isspace() or held[-1][-1:] == ">" else _WORD)
         cursor = en
     masked.append(text[cursor:])
     out = fn("".join(masked))
     parts = iter(held)
-    return re.sub(f"[{_WORD}{_OPENER}]", lambda m: next(parts), out), stats
+    return re.sub(_SENTINEL, lambda m: next(parts), out), stats
