@@ -66,11 +66,18 @@ def test_dashes_chicago_and_oxford():
      "Table –\n| a – b | c |\n|---|---|\n"),
     ("Pipe —\n|\n", "Pipe—\n|\n", "Pipe –\n|\n"),
     ("He paused\n— then spoke.\n", "He paused\n—then spoke.\n", "He paused\n– then spoke.\n"),
-    ("    -- indented start\n", "    —indented start\n", "    – indented start\n"),
+    ("Intro\n    -- indented start\n", "Intro\n    —indented start\n", "Intro\n    – indented start\n"),
 ])
 def test_dash_never_joins_lines(src, us, uk):
     assert normalize(src, "us", "chicago")[0] == us
     assert normalize(src, "uk", "oxford")[0] == uk
+
+
+def test_indented_code_block_is_left_alone():
+    # four spaces at the start of the text, or after a blank line, is an indented code block
+    for src in ("    -- indented start\n", "Intro.\n\n    a -- b\n"):
+        assert normalize(src, "us", "chicago")[0] == src
+        assert normalize(src, "uk", "oxford")[0] == src
 
 
 def test_html_comments_and_tags_are_protected():
