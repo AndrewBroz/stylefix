@@ -74,7 +74,15 @@ Then:
   `"project"`, `"detected"` or `"default"`.
 - When the source is `"detected"` or `"default"`, the per-file line says so:
   `draft.md: en-GB (detected) · 5 change(s), 6 for review` and, for the
-  default, `draft.md: no clear variety (1 UK, 1 US words); using en-US — set --target or lang:`.
+  default, `draft.md: no clear variety (0 UK, 0 US words); using en-US — set --target or lang:`.
+- (Final review ruling R2.) When detection is undecided with evidence
+  (`uk + us > 0`, no threshold met), the variety-spelling conversion is
+  skipped for that file: prosefix adds stylefix's `variety` and `ambiguous`
+  tiers to the file's style skip and drops stylefix's other-variety spelling
+  review notes; everything else follows the US default (LanguageTool runs as
+  en-US; its "is British English" spelling matches are already filtered). The
+  line reads `no clear variety (1 UK, 1 US words); variety spellings left alone — set --target or lang:`,
+  and `--json` settings gain `"variety_conversion": false`.
 - `--json` file entries gain `"target_source"` in `settings`, plus
   `"detected": {"uk": n, "us": m}` when detection ran.
 - Detection runs per file, so mixed vaults keep each note consistent.
@@ -120,10 +128,16 @@ identically to doubles found by `basics` and to LanguageTool's
 `ENGLISH_WORD_REPEAT_RULE` (which leaves proofix's always-apply list):
 
 - **Deterministic**: the word is in a closed list whose doubling is never
-  grammatical — articles (`a`, `an`, `the`), prepositions (`of`, `to`, `in`,
-  `on`, `at`, `for`, `with`, `from`, `by`, `into`, `onto`, `about`), and
-  `and`, `or`, `but`, `nor`, `it`, `we`, `they`, `my`, `your`, `our`, `their`.
-  One copy is removed.
+  grammatical — articles (`a`, `an`, `the`), prepositions (`of`, `to`, `at`,
+  `for`, `with`, `from`, `into`, `onto`), and `and`, `or`, `but`, `nor`, `it`,
+  `we`, `they`, `my`, `your`, `our`, `their`. One copy is removed. (Final
+  review ruling R1: `in`, `on`, `by` and `about` left the list, since they
+  double as a particle before a preposition: "log in in the corner", "turn it
+  on on Monday".) When LanguageTool's mechanical pass ran and did not flag a
+  closed-list double, it is adjudicated or reviewed instead: LanguageTool
+  knows exceptions the list does not.
+- **Not a double**: a hyphen touching either copy (`to to-do`, `for
+  for-profit`, `in in-house`).
 - **Adjudicated** (model available): any other doubled word becomes an item
   with the sentence as context, options `[<word>]` (one copy) and `KEEP`,
   and a rule telling the model that repeats like "that that" and "had had"

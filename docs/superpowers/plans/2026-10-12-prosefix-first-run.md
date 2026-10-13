@@ -21,7 +21,7 @@
 - New tier name `basics` (proofix); prosefix `PROOF_TIERS` gains it.
 - Detection thresholds exactly: `uk >= 2 and uk >= 2 * us` → uk; `us >= 2 and us >= 2 * uk` → us; else none.
 - `target_source` values exactly: `flag`, `front matter`, `lang`, `project`, `detected`, `default`.
-- Closed doubled-word list exactly: `a an the of to in on at for with from by into onto about and or but nor it we they my your our their`.
+- Closed doubled-word list exactly: `a an the of to at for with from into onto and or but nor it we they my your our their` (final review ruling R1 removed `in on by about`).
 - LanguageTool server: `languagetool-server --port N` (never `--public`), started per prosefix run, stopped at exit including errors and Ctrl-C; 30 s start timeout; fallback to the command line with one stderr line.
 - Messages (exact): tools line `prosefix: most fixes need Vale and LanguageTool — brew install andrewbroz/tap/prosefix (or: brew install <missing tools>)`; model line `prosefix: model decisions and comma placement need a model — prosefix --setup`; first-run tip `tip: prosefix --diff <path> shows changes without writing them`; server fallback `prosefix: LanguageTool server did not start (<reason>); using the command line`.
 - Never write to the user's real `~/.config` or `~/.cache` in tests; conftest already isolates XDG and `*_LLM_*`.
@@ -292,7 +292,7 @@ from dataclasses import dataclass
 
 from adjudicate import Edit
 
-CLOSED_DOUBLES = frozenset("a an the of to in on at for with from by into onto about "
+CLOSED_DOUBLES = frozenset("a an the of to at for with from into onto "
                            "and or but nor it we they my your our their".split())
 _DOUBLE = re.compile(r"\b([A-Za-z]+)( |\n(?![ \t]*(?:[-*+>#|]|\d+[.)])))(\1)\b", re.I)
 _SPACE_BEFORE = re.compile(r"(?<=\w)[ \t]+(?=[,;:!?]|\.(?!\.))")
