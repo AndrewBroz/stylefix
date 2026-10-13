@@ -28,11 +28,14 @@ class Detection:
     us: int
 
 
-_DETECT_WORD = re.compile(r"[a-z]+(?:[’'][a-z]+)?")
+# A whole lower-case word: not the tail of "Use" ("se"), "Age" ("ge") or "x_color".
+_DETECT_WORD = re.compile(r"(?<!\w)[a-z]{3,}(?:[’'][a-z]+)?(?!\w)")
 
 
-# Everyday or technical spellings in both varieties, whatever VarCon says.
-_NOT_EVIDENCE = frozenset({"artifact", "catalog"})
+# Everyday or technical spellings in both varieties, whatever VarCon says, and Latin
+# ("et al.", "per se"). Words under three letters are VarCon's fragments and
+# abbreviations ("ce", "ge", "fe") and never count.
+_NOT_EVIDENCE = frozenset({"artifact", "catalog", "et", "se"})
 
 
 @functools.lru_cache(maxsize=1)

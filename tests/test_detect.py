@@ -46,3 +46,20 @@ def test_shared_words_are_not_evidence():
 
 def test_indented_code_block_doesnt_count():
     assert detect_variety("Intro.\n\n    colour honour\n\nEnd.\n").uk == 0
+
+
+def test_part_of_a_capitalised_word_is_not_a_word():
+    # "Use" is not "se", "Age" not "ge", "Ace" not "ce" (VarCon lists those as US-only)
+    d = detect_variety("Use the new colour scheme. Age is no barrier; the programme is on track.\n")
+    assert (d.target, d.us) == ("uk", 0)
+    assert detect_variety("Ace the test. Use it.\n").us == 0
+
+
+def test_latin_fragments_are_not_evidence():
+    d = detect_variety("Smith et al. found the behaviour per se was rare. Use the programme.\n")
+    assert (d.target, d.us) == ("uk", 0)
+
+
+def test_word_boundaries_inside_words():
+    # a lower-case run inside a word with an underscore, digit or accent is not a word
+    assert detect_variety("x_color y2color caféolor\n") == Detection(None, 0, 0)
