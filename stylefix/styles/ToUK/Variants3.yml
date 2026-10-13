@@ -7,13 +7,6 @@ ignorecase: true
 action:
   name: replace
 swap:
-  perlingually: prelingually
-  permissable: premissable
-  permixture: premixture
-  pernasal: prenasal
-  peroral: preoral
-  perorally: preorally
-  perotic: preotic
   perperfect: preperfect
   perse: prese
   persolve: presolve
@@ -774,7 +767,6 @@ swap:
   tasseled: tasselled
   tasseling: tasselling
   tassells: tassels
-  te: tae
   teaselled: teaseled
   teaseller: teaseler
   teasellers: teaselers

@@ -131,6 +131,11 @@ def is_ise_cluster(c: Cluster) -> bool:
     return any(v == "Z" for tags in c.forms.values() for v, _ in tags)
 
 
+# A source word shorter than this is a fragment that is a real token in
+# ordinary text ("et" in "et al.", "te", "pe"), never a safe silent swap.
+MIN_SWAP_SOURCE = 3
+
+
 @lru_cache(maxsize=None)
 def maps(target: str) -> Maps:
     """Conversion map into `target` ('us', 'uk' or 'oxford')."""
@@ -153,7 +158,7 @@ def maps(target: str) -> Maps:
     for w, targets in proposals.items():
         if len(targets) > 1 or w in own:
             ambiguous[w] = set(targets) | ({w} if w in own else set())
-        else:
+        elif len(w) >= MIN_SWAP_SOURCE:
             convert[w] = next(iter(targets))
     return Maps(convert, ambiguous, glosses)
 

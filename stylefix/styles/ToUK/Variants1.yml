@@ -296,7 +296,6 @@ swap:
   autolyzing: autolysing
   autotoxemia: autotoxaemia
   autotoxemias: autotoxaemias
-  ax: axe
   azotemia: azotaemia
   azotorrhea: azotorrhoea
   bacillemia: bacillaemia
@@ -502,7 +501,6 @@ swap:
   cavilers: cavillers
   caviling: cavilling
   cavilings: cavillings
-  ce: coe
   cecally: caecally
   cecitis: caecitis
   cecitises: caecitises
@@ -1069,7 +1067,6 @@ swap:
   dyspneal: dyspnoeal
   dyspneas: dyspnoeas
   dyspneic: dyspnoeic
-  ec: aec
   ecoid: oecoid
   ecophobia: oecophobia
   ectethmoid: ectoethmoid
@@ -1196,7 +1193,6 @@ swap:
   epigeous: epigaeous
   epilog: epilogue
   epilogs: epilogues
-  eq: aeq
   equaled: equalled
   equaling: equalling
   erbia: rebia
@@ -1285,7 +1281,6 @@ swap:
   estuous: aestuous
   esture: aesture
   estus: aestus
-  et: aet
   etheling: aetheling
   ethered: aethered
   etheric: aetheric
@@ -1369,7 +1364,6 @@ swap:
   favorlesses: favourlesses
   favorlessest: favourlessest
   fayer: fayre
-  fe: fae
   fecal: faecal
   fecalith: faecalith
   feces: faeces
@@ -1507,3 +1501,9 @@ swap:
   fuze: fuse
   fuzed: fused
   fuzes: fuses
+  fuzing: fusing
+  galactorrhea: galactorrhoea
+  galactorrheas: galactorrhoeas
+  galactosemia: galactosaemia
+  galactosemias: galactosaemias
+  galee: galeae

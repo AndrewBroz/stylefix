@@ -65,3 +65,11 @@ def test_legacy_tables_are_covered():
                 continue
             misses.append((u, a, us_map.get(u), o))
     assert not misses, "\n".join(map(str, misses[:30])) + f"\n{len(misses)} misses"
+
+
+def test_no_swap_has_a_source_shorter_than_three_letters():
+    for m in (wordlist.to_us_map(), wordlist.to_uk_map(), wordlist.to_uk_map(False),
+              varcon.maps("us").convert, varcon.maps("uk").convert, varcon.maps("oxford").convert):
+        assert not [k for k in m if len(k) < 3]
+    for p in (wordlist.STYLES_DIR / "ToUK").glob("*.yml"):
+        assert "  et: aet" not in p.read_text()

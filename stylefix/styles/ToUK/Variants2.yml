@@ -7,12 +7,6 @@ ignorecase: true
 action:
   name: replace
 swap:
-  fuzing: fusing
-  galactorrhea: galactorrhoea
-  galactorrheas: galactorrhoeas
-  galactosemia: galactosaemia
-  galactosemias: galactosaemias
-  galee: galeae
   gambades: gambadoes
   gamboled: gambolled
   gamboling: gambolling
@@ -1408,7 +1402,6 @@ swap:
   patined: patinaed
   patrices: patricoes
   patte: pattae
-  pe: poe
   pedagog: pedagogue
   pedagogism: paedagogism
   pedagogs: pedagogues
@@ -1507,3 +1500,10 @@ swap:
   perjink: prejink
   perlection: prelection
   perlingual: prelingual
+  perlingually: prelingually
+  permissable: premissable
+  permixture: premixture
+  pernasal: prenasal
+  peroral: preoral
+  perorally: preorally
+  perotic: preotic

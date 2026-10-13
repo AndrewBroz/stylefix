@@ -167,3 +167,34 @@ def test_lower_case_may_and_march_are_not_months(text):
 def test_capitalised_may_is_a_month(text):
     r = api.fix(text, api.Options(target="uk", style="oxford"), None, Cache(None))
     assert not [a for a in r.review_alerts if a.check.endswith("Numbers")]
+
+
+SHORT_SOURCES = ("ax", "ce", "ec", "eq", "et", "fe", "pe", "te")
+
+
+def test_et_al_survives_a_uk_target_through_fix():
+    text = "Smith et al. found the behaviour per se was rare.\n"
+    r = api.fix(text, api.Options(target="uk"), None, Cache(None))
+    assert "et al." in r.text and "aet" not in r.text
+
+
+def test_et_al_survives_a_uk_target_through_the_cli(tmp_path):
+    from stylefix.cli import main
+    src = tmp_path / "doc.md"
+    src.write_text("Smith et al. found the behaviour per se was rare.\n")
+    out = tmp_path / "out.md"
+    assert main([str(src), "--target", "uk", "-o", str(out), "--llm", "none", "--no-cache"]) == 0
+    assert out.read_text() == src.read_text()
+
+
+@pytest.mark.parametrize("word", SHORT_SOURCES)
+@pytest.mark.parametrize("target", ["uk", "us"])
+def test_short_fragments_are_left_alone(word, target):
+    text = f"The label {word} stays as written here.\n"
+    r = api.fix(text, api.Options(target=target), None, Cache(None))
+    assert r.text == text
+
+
+def test_a_normal_swap_still_converts():
+    r = api.fix("The color was bright.\n", api.Options(target="uk"), None, Cache(None))
+    assert "colour" in r.text
