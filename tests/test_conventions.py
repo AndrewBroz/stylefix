@@ -232,3 +232,20 @@ def test_markdown_structure_survives_dashes(text, target):
         assert line_out.startswith(marker + " ") or line_out == line_in   # marker and its space kept
     if text.startswith(("|", "---", "- - -")):
         assert out == text                                                 # delimiter rows, rules untouched
+
+
+@pytest.mark.parametrize("target", ["us", "uk"])
+@pytest.mark.parametrize("row, want", [
+    ("| referred | — | 1 per 6 |\n", "| referred | — | 1 per 6 |\n"),
+    ("referred | — | 1 per 6\n", "referred | — | 1 per 6\n"),
+    ("| kept | -- | 2 |\n", "| kept | -- | 2 |\n"),
+    ("|—|—|\n", "|—|—|\n"),
+    ("| a — b | c |\n", "| a{s}b | c |\n"),
+])
+def test_dash_next_to_a_table_pipe_keeps_its_spacing(row, want, target):
+    """A dash alone in a cell is a placeholder and is left as written.
+    A dash inside a cell's text still follows the guide."""
+    text = "| A | B | C |\n|---|---|---|\n" + row
+    out, _ = normalize(text, target, "chicago" if target == "us" else "oxford")
+    spaced = "—" if target == "us" else " – "
+    assert out.splitlines()[2] + "\n" == want.format(s=spaced)

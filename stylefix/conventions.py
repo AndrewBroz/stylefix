@@ -156,9 +156,31 @@ def parenthetical_dashes(s: str, style: str, stats: Stats) -> str:
         if _DELIMITER_ROW.match(line):
             out.append(line)
             continue
+        if "|" in line:
+            out.append(_table_row_dashes(line, style, stats))
+            continue
         cut = _LINE_MARKER.match(line).end()
         out.append(line[:cut] + _parenthetical_dashes(line[cut:], style, stats))
     return "".join(out)
+
+
+_CELL_PLACEHOLDER = re.compile(r"^\s*(?:--|—|–)\s*$")
+
+
+def _table_row_dashes(line: str, style: str, stats: Stats) -> str:
+    """A row is split at its pipes so a pipe is never mistaken for a word:
+    a cell holding only a dash is a placeholder and stays as written; the
+    text of any other cell gets the guide's dashes, with the spacing against
+    the pipes kept."""
+    body = line.rstrip("\n")
+    cells = body.split("|")
+    for i, cell in enumerate(cells):
+        if not cell.strip() or _CELL_PLACEHOLDER.match(cell):
+            continue
+        lead = cell[:len(cell) - len(cell.lstrip())]
+        trail = cell[len(cell.rstrip()):]
+        cells[i] = lead + _parenthetical_dashes(cell.strip(), style, stats) + trail
+    return "|".join(cells) + line[len(body):]
 
 
 def _parenthetical_dashes(s: str, style: str, stats: Stats) -> str:
